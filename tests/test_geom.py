@@ -1,12 +1,13 @@
 from math import pi
 from functools import partial
+from itertools import permutations
 
 import pytest
 import hypothesis.strategies as st
 from hypothesis import given
 import numpy as np
 
-from geovoronoi._geom import angle_between_pts, inner_angle_between_vecs
+from geovoronoi._geom import angle_between_pts, inner_angle_between_vecs, polygon_around_center
 
 # hypothesis generator shortcuts
 real_floats = partial(st.floats, allow_nan=False, allow_infinity=False)
@@ -38,3 +39,27 @@ def test_angle_between_pts(a, b):
         assert np.isnan(ang)
     else:
         assert 0 <= ang <= 2*pi
+
+
+def test_polygon_around_center():
+    points = np.array([[0, 0], [1, 0], [1, 1], [1, 0], [1, -1]])
+
+    for perm_ind in permutations(range(len(points))):
+        # many of these permutations do not form a valid polygon in that order
+        # `polygon_around_center` will make sure that the order of points is correct to create a polygon around the
+        # center of these points
+        poly = polygon_around_center(points[perm_ind,:])
+
+        assert poly.is_simple and poly.is_valid
+
+
+def test_polygon_around_center_given_center_is_one_of_points():
+    points = np.array([[0, 0], [1, 0], [1, 1], [1, 0], [0.5, 0.5]])
+
+    for perm_ind in permutations(range(len(points))):
+        # many of these permutations do not form a valid polygon in that order
+        # `polygon_around_center` will make sure that the order of points is correct to create a polygon around the
+        # center of these points
+        poly = polygon_around_center(points[perm_ind,:], center=(0.5, 0.5))
+
+        assert poly.is_simple and poly.is_valid
