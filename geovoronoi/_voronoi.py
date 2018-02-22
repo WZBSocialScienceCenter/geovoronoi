@@ -30,7 +30,7 @@ def points_to_coords(pts):
 def voronoi_regions_from_coords(coords, geo_shape, accept_n_coord_duplicates=0, flatten_assignments=True):
     logger.info('running Voronoi tesselation for %d points' % len(coords))
     vor = Voronoi(coords)
-    logger.info('generated %d Voronoi regions' % len(vor.regions))
+    logger.info('generated %d Voronoi regions' % (len(vor.regions)-1))
 
     logger.info('generating Voronoi polygon lines')
     poly_lines = polygon_lines_from_voronoi(vor, geo_shape)
