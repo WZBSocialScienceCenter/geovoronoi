@@ -164,7 +164,7 @@ def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
     if 'markersize' in kwargs:
         del kwargs['markersize']
 
-    collection = PatchCollection([PolygonPatch(poly) for poly, c in zip(geoms, color)],
+    collection = PatchCollection([PolygonPatch(poly) for poly in geoms],
                                  color=color, **kwargs)
 
     ax.add_collection(collection, autolim=True)

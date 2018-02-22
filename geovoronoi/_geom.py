@@ -72,3 +72,10 @@ def polygon_around_center(points, center=None, fix_nan_angles=True):
         else:
             return None
 
+
+def calculate_polygon_areas(poly_shapes, m2_to_km2=False):
+    areas = np.array([p.area for p in poly_shapes])
+    if m2_to_km2:
+        return areas / 1000000    # = 1000²
+    else:
+        return areas
