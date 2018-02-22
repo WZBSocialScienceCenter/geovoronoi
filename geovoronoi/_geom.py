@@ -1,6 +1,8 @@
 """
 Geometry helper functions in cartesian 2D space.
 
+"shapely" refers to the [Shapely Python package for computational geometry](http://toblerity.org/shapely/index.html).
+
 Author: Markus Konrad <markus.konrad@wzb.eu>
 """
 
