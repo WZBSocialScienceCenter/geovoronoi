@@ -9,7 +9,7 @@ Author: Markus Konrad <markus.konrad@wzb.eu>
 
 import numpy as np
 import matplotlib.pyplot as plt
-from geopandas.plotting import plot_polygon_collection
+from geopandas.plotting import _flatten_multi_geoms
 
 from ._voronoi import points_to_coords
 
@@ -44,7 +44,7 @@ def colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments, cma
 
 def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None, label_fontsize=10, label_color=None,
                        **kwargs):
-    plot_polygon_collection(ax, poly_shapes, color=color, edgecolor=edgecolor, **kwargs)
+    _plot_polygon_collection_with_color(ax, poly_shapes, color=color, edgecolor=edgecolor, **kwargs)
 
     if labels:
         n_labels = len(labels)
@@ -92,10 +92,10 @@ def plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, points, 
     plot_voronoi_opts = plot_voronoi_opts or {'alpha': 0.5}
     plot_points_opts = plot_points_opts or {}
 
-    plot_polygon_collection(ax, [area_shape], color=area_color, edgecolor=area_edgecolor, **plot_area_opts)
+    _plot_polygon_collection_with_color(ax, [area_shape], color=area_color, edgecolor=area_edgecolor, **plot_area_opts)
 
     if voronoi_and_points_cmap and poly_to_pt_assignments and \
-            not any(map(bool, (voronoi_color, voronoi_edgecolor, points_color))):
+            not all(map(bool, (voronoi_color, voronoi_edgecolor, points_color))):
         voronoi_color, points_color = colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments,
                                                                           cmap_name=voronoi_and_points_cmap)
 
@@ -121,3 +121,52 @@ def _color_for_labels(label_color, default_color, seq_index):
         c = label_color
 
     return c or 'black'
+
+
+def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
+    """
+    This is a hacked version of geopanda's `plot_polygon_collection` function that also accepts a sequences of colors
+    passed as `color` for each polygon in `geoms` and *uses them correctly even when `geoms` contains MultiPolygon
+    objects*.
+
+    Plots a collection of Polygon and MultiPolygon geometries to `ax`
+
+    Parameters
+    ----------
+
+    ax : matplotlib.axes.Axes
+        where shapes will be plotted
+
+    geoms : a sequence of `N` Polygons and/or MultiPolygons (can be mixed)
+
+    color : a sequence of `N` colors (optional) or None for default color or a single color for all shapes
+
+    edgecolor : single color or sequence of `N` colors
+        Color for the edge of the polygons
+
+    **kwargs
+        Additional keyword arguments passed to the collection
+
+    Returns
+    -------
+
+    collection : matplotlib.collections.Collection that was plotted
+    """
+    from descartes.patch import PolygonPatch
+    from matplotlib.collections import PatchCollection
+
+    if type(color) in (list, tuple):
+        geoms, color = _flatten_multi_geoms(geoms, color)
+    else:
+        geoms, _ = _flatten_multi_geoms(geoms)
+
+    # PatchCollection does not accept some kwargs.
+    if 'markersize' in kwargs:
+        del kwargs['markersize']
+
+    collection = PatchCollection([PolygonPatch(poly) for poly, c in zip(geoms, color)],
+                                 color=color, **kwargs)
+
+    ax.add_collection(collection, autolim=True)
+    ax.autoscale_view()
+    return collection
