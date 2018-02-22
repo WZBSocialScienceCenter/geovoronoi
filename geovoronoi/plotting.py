@@ -125,7 +125,7 @@ def _color_for_labels(label_color, default_color, seq_index):
 
 def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
     """
-    This is a hacked version of geopanda's `plot_polygon_collection` function that also accepts a sequences of colors
+    This is a modified version of geopanda's `plot_polygon_collection` function that also accepts a sequences of colors
     passed as `color` for each polygon in `geoms` and *uses them correctly even when `geoms` contains MultiPolygon
     objects*.
 

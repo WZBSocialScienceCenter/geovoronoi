@@ -7,6 +7,7 @@ Author: Markus Konrad <markus.konrad@wzb.eu>
 """
 
 import logging
+
 import numpy as np
 from scipy.spatial import Voronoi
 from shapely.geometry import LineString, asPoint
