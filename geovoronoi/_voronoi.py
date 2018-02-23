@@ -28,8 +28,9 @@ def points_to_coords(pts):
     return np.array([p.coords[0] for p in pts])
 
 
-def voronoi_regions_from_coords(coords, geo_shape, accept_n_coord_duplicates=0, flatten_assignments=True):
-    logger.info('running Voronoi tesselation for %d points' % len(coords))
+def voronoi_regions_from_coords(coords, geo_shape, accept_n_coord_duplicates=0):
+    logger.info('running Voronoi tesselation for %d points with %d expected duplicates'
+                % (len(coords), accept_n_coord_duplicates))
     vor = Voronoi(coords)
     logger.info('generated %d Voronoi regions' % (len(vor.regions)-1))
 
@@ -42,8 +43,7 @@ def voronoi_regions_from_coords(coords, geo_shape, accept_n_coord_duplicates=0, 
     logger.info('assigning %d points to %d Voronoi polygons' % (len(coords), len(poly_shapes)))
     points = coords_to_points(coords)
     poly_to_pt_assignments = assign_points_to_voronoi_polygons(points, poly_shapes,
-                                                               accept_n_coord_duplicates=accept_n_coord_duplicates,
-                                                               flatten_assignments=flatten_assignments)
+                                                               accept_n_coord_duplicates=accept_n_coord_duplicates)
 
     return poly_shapes, points, poly_to_pt_assignments
 
@@ -146,7 +146,7 @@ def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None):
     return poly_shapes
 
 
-def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplicates=0, flatten_assignments=True):
+def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplicates=0):
     """
     Assign a list/array of shapely Point objects `points` to their respective Voronoi polygons passed as list
     `poly_shapes`. Return a list of `assignments` of size `len(poly_shapes)` where ith element in `assignments`
@@ -185,9 +185,13 @@ def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplic
     assert sum(map(len, assignments)) == len(poly_shapes) + accept_n_coord_duplicates
     assert len(unassigned) == 0
 
-    if flatten_assignments and accept_n_coord_duplicates == 0:
-        flattened = sum(assignments, [])
-        assert len(flattened) == len(assignments)
-        return flattened
-    else:
-        return assignments
+    return assignments
+
+
+def get_points_to_poly_assignments(poly_to_pt_assignments):
+    """Reverse of poly to points assignments"""
+    pt_poly = [(i_pt, i_vor)
+               for i_vor, pt_indices in enumerate(poly_to_pt_assignments)
+               for i_pt in pt_indices]
+
+    return [i_vor for _, i_vor in sorted(pt_poly, key=lambda x: x[0])]

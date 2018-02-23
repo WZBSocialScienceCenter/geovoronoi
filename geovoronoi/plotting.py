@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from geopandas.plotting import _flatten_multi_geoms
 
-from ._voronoi import points_to_coords
+from ._voronoi import points_to_coords, get_points_to_poly_assignments
 
 
 def subplot_for_map(show_x_axis=False, show_y_axis=False, aspect='equal', **kwargs):
@@ -35,9 +35,10 @@ def generate_n_colors(n, cmap_name='tab20'):
 
 def colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments, cmap_name='tab20'):
     vor_colors = generate_n_colors(len(poly_shapes), cmap_name=cmap_name)
-    pt_colors = [vor_colors[poly_to_pt_assignments.index(i_pt)] for i_pt in range(max(poly_to_pt_assignments)+1)]
 
-    assert len(vor_colors) == len(pt_colors)
+    pt_colors = [vor_colors[i_vor] for i_vor in get_points_to_poly_assignments(poly_to_pt_assignments)]
+
+    assert len(vor_colors) <= len(pt_colors)
 
     return vor_colors, pt_colors
 
@@ -59,7 +60,7 @@ def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None,
 
 
 def plot_points(ax, points, markersize, marker='o', color=None, labels=None, label_fontsize=7, label_color=None,
-                **kwargs):
+                label_draw_duplicates=False, **kwargs):
     if not isinstance(points, np.ndarray):
         coords = points_to_coords(points)
     else:
@@ -74,8 +75,12 @@ def plot_points(ax, points, markersize, marker='o', color=None, labels=None, lab
             raise ValueError('number of labels (%d) must match number of points (%d)'
                              % (n_labels, n_features))
 
-        for i, ((tx, ty), lbl) in enumerate(zip(coords, labels)):
-            ax.text(tx, ty, lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
+        drawn_coords = set()
+        for i, (pos, lbl) in enumerate(zip(coords, labels)):
+            pos = tuple(pos)  # make hashable
+            if label_draw_duplicates or pos not in drawn_coords:
+                ax.text(pos[0], pos[1], lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
+                drawn_coords.add(pos)
 
 
 def plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, points, poly_to_pt_assignments=None,
