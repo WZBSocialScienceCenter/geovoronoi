@@ -94,7 +94,7 @@ fig, ax = subplot_for_map()
 plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords,
                                        plot_voronoi_opts={'alpha': 0.2},
                                        plot_points_opts={'alpha': 0.4},
-                                       voronoi_color=vor_colors,
+                                       voronoi_color=list(vor_colors),
                                        point_labels=pt_labels,
                                        points_markersize=np.array(count_per_pt)*10)
 
