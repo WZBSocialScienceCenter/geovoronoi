@@ -80,14 +80,21 @@ pprint(pts_to_poly_assignments)
 # plotting
 #
 
+# make point labels: counts of duplicates per points
 count_per_pt = [sum(pts_to_poly_assignments == i_poly) for i_poly in pts_to_poly_assignments]
 pt_labels = list(map(str, count_per_pt))
+
+# highlight voronoi regions with point duplicates
+count_per_poly = np.array(list(map(len, poly_to_pt_assignments)))
+vor_colors = np.repeat('blue', len(poly_shapes))   # default color
+vor_colors[count_per_poly > 1] = 'red'             # hightlight color
 
 fig, ax = subplot_for_map()
 
 plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords,
                                        plot_voronoi_opts={'alpha': 0.2},
                                        plot_points_opts={'alpha': 0.4},
+                                       voronoi_color=vor_colors,
                                        point_labels=pt_labels,
                                        points_markersize=np.array(count_per_pt)*10)
 
