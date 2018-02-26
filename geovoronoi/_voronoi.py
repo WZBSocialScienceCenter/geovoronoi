@@ -11,8 +11,8 @@ import logging
 import numpy as np
 from scipy.spatial import Voronoi
 from scipy.spatial.distance import cdist
-from shapely.geometry import LineString, asPoint
-from shapely.ops import polygonize
+from shapely.geometry import MultiPolygon, LineString, asPoint
+from shapely.ops import polygonize, cascaded_union
 
 from ._geom import polygon_around_center
 
@@ -29,9 +29,11 @@ def points_to_coords(pts):
     return np.array([p.coords[0] for p in pts])
 
 
-def voronoi_regions_from_coords(coords, geo_shape, accept_n_coord_duplicates=0):
-    logger.info('running Voronoi tesselation for %d points with %d expected duplicates'
-                % (len(coords), accept_n_coord_duplicates))
+def voronoi_regions_from_coords(coords, geo_shape,
+                                shapes_from_diff_with_min_area=None,
+                                accept_n_coord_duplicates=None,
+                                return_unassigned_points=False):
+    logger.info('running Voronoi tesselation for %d points' % len(coords))
     vor = Voronoi(coords)
     logger.info('generated %d Voronoi regions' % (len(vor.regions)-1))
 
@@ -39,15 +41,20 @@ def voronoi_regions_from_coords(coords, geo_shape, accept_n_coord_duplicates=0):
     poly_lines = polygon_lines_from_voronoi(vor, geo_shape)
 
     logger.info('generating Voronoi polygon shapes')
-    poly_shapes = polygon_shapes_from_voronoi_lines(poly_lines, geo_shape)
+    poly_shapes = polygon_shapes_from_voronoi_lines(poly_lines, geo_shape,
+                                                    shapes_from_diff_with_min_area=shapes_from_diff_with_min_area)
 
     logger.info('assigning %d points to %d Voronoi polygons' % (len(coords), len(poly_shapes)))
     points = coords_to_points(coords)
-    poly_to_pt_assignments = assign_points_to_voronoi_polygons(points, poly_shapes,
-                                                               accept_n_coord_duplicates=accept_n_coord_duplicates,
-                                                               coords=coords)
+    poly_to_pt_assignments, unassigned_pts = assign_points_to_voronoi_polygons(points, poly_shapes,
+                                                                               accept_n_coord_duplicates=accept_n_coord_duplicates,
+                                                                               return_unassigned_points=True,
+                                                                               coords=coords)
 
-    return poly_shapes, points, poly_to_pt_assignments
+    if return_unassigned_points:
+        return poly_shapes, points, poly_to_pt_assignments, list(unassigned_pts)
+    else:
+        return poly_shapes, points, poly_to_pt_assignments
 
 
 def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
@@ -117,6 +124,9 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
     if not far_points_hull.contains(geo_shape):   # if that's the case, merge it by taking the union
         far_points_hull = far_points_hull.union(geo_shape)
 
+    # vor_mpoly = MultiPolygon([p for p in polygonize(poly_lines)])
+    # far_points_hull = far_points_hull.union(vor_mpoly)
+
     # now add the lines that make up `far_points_hull` to the final `poly_lines` list
     far_points_hull_coords = far_points_hull.exterior.coords
     for i, pt in list(enumerate(far_points_hull_coords))[1:]:
@@ -129,7 +139,7 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
         return poly_lines, loose_ridges, far_points
 
 
-def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None):
+def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None, shapes_from_diff_with_min_area=None):
     """
     Form shapely Polygons objects from a list of shapely LineString objects in `poly_lines` by using
     [`polygonize`](http://toblerity.org/shapely/manual.html#shapely.ops.polygonize). If `geo_shape` is not None, then
@@ -145,10 +155,19 @@ def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None):
 
         poly_shapes.append(p)
 
+    if geo_shape is not None and shapes_from_diff_with_min_area is not None:
+        vor_polys_union = cascaded_union(poly_shapes)
+        diff = np.array(geo_shape.difference(vor_polys_union), dtype=object)
+        diff_areas = np.array([p.area for p in diff])
+        poly_shapes.extend(diff[diff_areas >= shapes_from_diff_with_min_area])
+
     return poly_shapes
 
 
-def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplicates=0, coords=None):
+def assign_points_to_voronoi_polygons(points, poly_shapes,
+                                      accept_n_coord_duplicates=None,
+                                      return_unassigned_points=False,
+                                      coords=None):
     """
     Assign a list/array of shapely Point objects `points` to their respective Voronoi polygons passed as list
     `poly_shapes`. Return a list of `assignments` of size `len(poly_shapes)` where ith element in `assignments`
@@ -156,12 +175,22 @@ def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplic
     Normally, 1-to-1 assignments are expected, i.e. for each Voronoi region in `poly_shapes` there's exactly one point
     in `points` belonging to this Voronoi region. However, if there are duplicate coordinates in `points`, then those
     duplicates will be assigned together to their Voronoi region and hence there is a 1-to-n relationship between
-    Voronoi regions and points. In this case `accept_n_coord_duplicates` should be set to the number of duplicates in
-    `points` and a nested list of assignments will be returned (this is also the case when `flatten_assignments` is
-    False).
+    Voronoi regions and points. If `accept_n_coord_duplicates` is set to None, then an anunspecified number of duplicates
+    are generally allowed. If `accept_n_coord_duplicates` is 0, then no point duplicates are allowed, otherwise
+    exactly `accept_n_coord_duplicates` duplicates are allowed.
     """
     n_polys = len(poly_shapes)
     n_points = len(points)
+
+    if n_polys > n_points:
+        raise ValueError('The number of voronoi regions must be smaller or equal to the number of points')
+
+    if accept_n_coord_duplicates is None:
+        dupl_restricted = False
+        accept_n_coord_duplicates = n_points - n_polys
+    else:
+        dupl_restricted = True
+
     expected_n_geocoords = n_points - accept_n_coord_duplicates
 
     if coords is None:
@@ -200,10 +229,21 @@ def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplic
         assignments.append(assigned_pts)
         n_assigned_dupl += len(assigned_pts)-1
 
-    assert sum(map(len, assignments)) == len(poly_shapes) + accept_n_coord_duplicates
-    assert len(set(sum(assignments, []))) == n_points   # make sure all points were assigned
+    assert len(assignments) == len(poly_shapes)
 
-    return assignments
+    if dupl_restricted:
+        assert n_assigned_dupl == accept_n_coord_duplicates
+        assert sum(map(len, assignments)) == len(poly_shapes) + accept_n_coord_duplicates
+        assert len(set(sum(assignments, []))) == n_points   # make sure all points were assigned
+        unassigned_pt_indices = set()
+    else:
+        assigned_pt_indices = set(sum(assignments, []))
+        unassigned_pt_indices = set(range(n_points)) - assigned_pt_indices
+
+    if return_unassigned_points:
+        return assignments, unassigned_pt_indices
+    else:
+        return assignments
 
 
 def get_points_to_poly_assignments(poly_to_pt_assignments):

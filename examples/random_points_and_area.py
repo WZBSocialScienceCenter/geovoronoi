@@ -47,7 +47,7 @@ del pts
 # calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
 #
 
-poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
+poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape, shapes_from_diff_with_min_area=1)
 
 poly_areas = calculate_polygon_areas(poly_shapes, m2_to_km2=True)   # converts m² to km²
 
