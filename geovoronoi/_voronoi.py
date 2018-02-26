@@ -177,13 +177,17 @@ def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplic
     poly_pt_dists = cdist(poly_centroids, coords)
 
     assignments = []
+    n_assigned_dupl = 0
     for i_poly, vor_poly in enumerate(poly_shapes):
         closest_pt_indices = np.argsort(poly_pt_dists[i_poly])
         assigned_pts = []
+        n_assigned = len(assigned_pts)
         for i_pt in closest_pt_indices:
-            if points[i_pt].intersects(vor_poly):
+            pt = points[i_pt]
+
+            if pt.intersects(vor_poly):
                 assigned_pts.append(i_pt)
-                if len(assigned_pts) >= accept_n_coord_duplicates + 1:
+                if n_assigned >= accept_n_coord_duplicates - n_assigned_dupl:
                     break
 
         if not assigned_pts:
@@ -194,6 +198,7 @@ def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplic
                                % (i_poly, str(assigned_pts)))
 
         assignments.append(assigned_pts)
+        n_assigned_dupl += len(assigned_pts)-1
 
     assert sum(map(len, assignments)) == len(poly_shapes) + accept_n_coord_duplicates
     assert len(set(sum(assignments, []))) == n_points   # make sure all points were assigned
