@@ -1,5 +1,4 @@
 import logging
-from pprint import pprint
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -67,13 +66,14 @@ poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, a
 
 # poly_to_pt_assignments is a nested list!
 
-print('voronoi region to points assignments:')
-pprint(poly_to_pt_assignments)
+print('\n\nvoronoi region to points assignments:')
+for i_poly, pt_indices in enumerate(poly_to_pt_assignments):
+    print('> voronoi region', i_poly, '-> points', str(pt_indices))
 
-print('voronoi points to region assignments:')
+print('\n\nvoronoi points to region assignments:')
 pts_to_poly_assignments = np.array(get_points_to_poly_assignments(poly_to_pt_assignments))
-pprint(pts_to_poly_assignments)
-
+for i_pt, i_poly in enumerate(pts_to_poly_assignments):
+    print('> point ', i_pt, '-> voronoi region', i_poly)
 
 
 #

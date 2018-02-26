@@ -10,6 +10,7 @@ import logging
 
 import numpy as np
 from scipy.spatial import Voronoi
+from scipy.spatial.distance import cdist
 from shapely.geometry import LineString, asPoint
 from shapely.ops import polygonize
 
@@ -43,7 +44,8 @@ def voronoi_regions_from_coords(coords, geo_shape, accept_n_coord_duplicates=0):
     logger.info('assigning %d points to %d Voronoi polygons' % (len(coords), len(poly_shapes)))
     points = coords_to_points(coords)
     poly_to_pt_assignments = assign_points_to_voronoi_polygons(points, poly_shapes,
-                                                               accept_n_coord_duplicates=accept_n_coord_duplicates)
+                                                               accept_n_coord_duplicates=accept_n_coord_duplicates,
+                                                               coords=coords)
 
     return poly_shapes, points, poly_to_pt_assignments
 
@@ -146,7 +148,7 @@ def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None):
     return poly_shapes
 
 
-def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplicates=0):
+def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplicates=0, coords=None):
     """
     Assign a list/array of shapely Point objects `points` to their respective Voronoi polygons passed as list
     `poly_shapes`. Return a list of `assignments` of size `len(poly_shapes)` where ith element in `assignments`
@@ -159,31 +161,42 @@ def assign_points_to_voronoi_polygons(points, poly_shapes, accept_n_coord_duplic
     False).
     """
     n_polys = len(poly_shapes)
-    n_geocoords = len(points)
-    expected_n_geocoords = n_geocoords - accept_n_coord_duplicates
+    n_points = len(points)
+    expected_n_geocoords = n_points - accept_n_coord_duplicates
+
+    if coords is None:
+        coords = points_to_coords(points)
+    elif len(coords) != n_points:
+        raise ValueError('`coords` and `points` must have the same length')
 
     if accept_n_coord_duplicates >= 0 and n_polys != expected_n_geocoords:
-        raise ValueError('Unexpected number of geo-coordinates: %d (got %d polygons and expected %d geo-coordinates' %
-                         (expected_n_geocoords, n_geocoords, expected_n_geocoords))
+        raise ValueError('Unexpected number of geo-coordinates: %d (got %d polygons and expected %d geo-coordinates)' %
+                         (n_points, n_polys, expected_n_geocoords))
 
-    unassigned = dict(enumerate(points))
+    poly_centroids = np.array([p.centroid.coords[0] for p in poly_shapes])
+    poly_pt_dists = cdist(poly_centroids, coords)
+
     assignments = []
     for i_poly, vor_poly in enumerate(poly_shapes):
-        tmp_assigned = [i_pt for i_pt, pt in unassigned.items() if pt.intersects(vor_poly)]
+        closest_pt_indices = np.argsort(poly_pt_dists[i_poly])
+        assigned_pts = []
+        for i_pt in closest_pt_indices:
+            if points[i_pt].intersects(vor_poly):
+                assigned_pts.append(i_pt)
+                if len(assigned_pts) >= accept_n_coord_duplicates + 1:
+                    break
 
-        if not tmp_assigned:
+        if not assigned_pts:
             raise RuntimeError('Polygon %d does not contain any point' % i_poly)
 
-        if accept_n_coord_duplicates == 0 and len(tmp_assigned) > 1:
+        if accept_n_coord_duplicates == 0 and len(assigned_pts) > 1:
             raise RuntimeError('No duplicate points allowed but polygon %d contains several points: %s'
-                               % (i_poly, str(tmp_assigned)))
+                               % (i_poly, str(assigned_pts)))
 
-        assignments.append(tmp_assigned)
-        for i_pt in tmp_assigned:
-            del unassigned[i_pt]
+        assignments.append(assigned_pts)
 
     assert sum(map(len, assignments)) == len(poly_shapes) + accept_n_coord_duplicates
-    assert len(unassigned) == 0
+    assert len(set(sum(assignments, []))) == n_points   # make sure all points were assigned
 
     return assignments
 
