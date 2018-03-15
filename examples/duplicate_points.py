@@ -1,3 +1,13 @@
+"""
+Example script to show how to handle duplicate points for which Voronoi regions should be generated.
+
+Duplicate points, i.e. points with exactly the same coordinates will belong to the same Voronoi region.
+
+Author: Markus Konrad <markus.konrad@wzb.eu>
+March 2018
+"""
+
+
 import logging
 
 import matplotlib.pyplot as plt
@@ -9,9 +19,9 @@ from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_
 
 
 logging.basicConfig(level=logging.INFO)
-tmtoolkit_log = logging.getLogger('geovoronoi')
-tmtoolkit_log.setLevel(logging.INFO)
-tmtoolkit_log.propagate = True
+geovoronoi_log = logging.getLogger('geovoronoi')
+geovoronoi_log.setLevel(logging.INFO)
+geovoronoi_log.propagate = True
 
 N_POINTS = 20
 N_DUPL = 10
@@ -60,17 +70,19 @@ print('duplicated %d random points -> we have %d coordinates now' % (N_DUPL, len
 #
 # calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
 #
+# the duplicate coordinates will belong to the same voronoi region
+#
 
 poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape,
                                                                        accept_n_coord_duplicates=N_DUPL)
 
-# poly_to_pt_assignments is a nested list!
+# poly_to_pt_assignments is a nested list because a voronoi region might contain several (duplicate) points
 
 print('\n\nvoronoi region to points assignments:')
 for i_poly, pt_indices in enumerate(poly_to_pt_assignments):
     print('> voronoi region', i_poly, '-> points', str(pt_indices))
 
-print('\n\nvoronoi points to region assignments:')
+print('\n\npoints to voronoi region assignments:')
 pts_to_poly_assignments = np.array(get_points_to_poly_assignments(poly_to_pt_assignments))
 for i_pt, i_poly in enumerate(pts_to_poly_assignments):
     print('> point ', i_pt, '-> voronoi region', i_poly)

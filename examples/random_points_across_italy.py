@@ -1,3 +1,12 @@
+"""
+Example script that scatters random points across a country and generates the Voronoi regions for them. Both the regions
+and their points will be plotted using the `plotting` sub-module of `geovoronoi`.
+
+Author: Markus Konrad <markus.konrad@wzb.eu>
+March 2018
+"""
+
+
 import logging
 
 import matplotlib.pyplot as plt
@@ -9,9 +18,9 @@ from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_
 
 
 logging.basicConfig(level=logging.INFO)
-tmtoolkit_log = logging.getLogger('geovoronoi')
-tmtoolkit_log.setLevel(logging.INFO)
-tmtoolkit_log.propagate = True
+geovoronoi_log = logging.getLogger('geovoronoi')
+geovoronoi_log.setLevel(logging.INFO)
+geovoronoi_log.propagate = True
 
 N_POINTS = 100
 COUNTRY = 'Italy'

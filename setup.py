@@ -1,5 +1,5 @@
 """
-tmtoolkit setuptools based setup module
+geovoronoi setuptools based setup module
 """
 
 from setuptools import setup

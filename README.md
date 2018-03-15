@@ -6,4 +6,5 @@
 
 ## TODO
 
-* better support of MultiPolygon shapes of geographic areas (see Sardinia in `random_points_across_italy.py` example)
+* support of MultiPolygon shapes of geographic areas (see Sardinia in `random_points_across_italy.py` example)
+* support for plotting `area_shape` objects with multiple geometries

@@ -1,3 +1,12 @@
+"""
+Example script that scatters random points across a country and generates the Voronoi regions for them. Additionally,
+the area (km²) for those regions will be calculated. Both the regions and their area will be plotted using the
+`plotting` sub-module of `geovoronoi`.
+
+Author: Markus Konrad <markus.konrad@wzb.eu>
+March 2018
+"""
+
 import logging
 
 import matplotlib.pyplot as plt
@@ -9,9 +18,9 @@ from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_
 
 
 logging.basicConfig(level=logging.INFO)
-tmtoolkit_log = logging.getLogger('geovoronoi')
-tmtoolkit_log.setLevel(logging.INFO)
-tmtoolkit_log.propagate = True
+geovoronoi_log = logging.getLogger('geovoronoi')
+geovoronoi_log.setLevel(logging.INFO)
+geovoronoi_log.propagate = True
 
 N_POINTS = 20
 COUNTRY = 'Spain'
@@ -47,8 +56,10 @@ del pts
 # calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
 #
 
-poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape, shapes_from_diff_with_min_area=1)
+poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape,
+                                                                       shapes_from_diff_with_min_area=1)
 
+# calculate area in km², too
 poly_areas = calculate_polygon_areas(poly_shapes, m2_to_km2=True)   # converts m² to km²
 
 #
