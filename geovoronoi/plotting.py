@@ -15,6 +15,10 @@ from ._voronoi import points_to_coords, get_points_to_poly_assignments
 
 
 def subplot_for_map(show_x_axis=False, show_y_axis=False, aspect='equal', **kwargs):
+    """
+    Helper function to generate a matplotlib subplot Axes object suitable for plotting geographic data, i.e. axis
+    labels are not shown and aspect ratio is set to 'equal' by default.
+    """
     fig, ax = plt.subplots(**kwargs)
     ax.set_aspect(aspect)
 
@@ -28,12 +32,20 @@ def subplot_for_map(show_x_axis=False, show_y_axis=False, aspect='equal', **kwar
 
 
 def generate_n_colors(n, cmap_name='tab20'):
+    """
+    Get a list of `n` numbers from matplotlib color map `cmap_name`. If `n` is larger than the number of colors in the
+    color map, the colors will be recycled, i.e. they are not unique in this case.
+    """
     pt_region_colormap = plt.get_cmap(cmap_name)
     max_i = len(pt_region_colormap.colors)
     return [pt_region_colormap(i % max_i) for i in range(n)]
 
 
 def colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments, cmap_name='tab20'):
+    """
+    Generate colors for the shapes and points in `poly_shapes` and `poly_to_pt_assignments` using matplotlib color
+    map `cmap_name`.
+    """
     vor_colors = generate_n_colors(len(poly_shapes), cmap_name=cmap_name)
 
     pt_colors = [vor_colors[i_vor] for i_vor in get_points_to_poly_assignments(poly_to_pt_assignments)]
@@ -45,9 +57,17 @@ def colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments, cma
 
 def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None, label_fontsize=10, label_color=None,
                        **kwargs):
+    """
+    Plot Voronoi region polygons in `poly_shapes` on matplotlib Axes object `ax`. Use fill color `color`, edge color
+    `edgecolor`. Optionally supply a list of labels `labels` that will be displayed on the respective Voronoi region
+    using the styling options `label_fontsize` and `label_color`. All color parameters can also be a sequence.
+    Additional parameters can be passed to GeoPandas' `_plot_polygon_collection_with_color` function as `kwargs`.
+    """
+
     _plot_polygon_collection_with_color(ax, poly_shapes, color=color, edgecolor=edgecolor, **kwargs)
 
     if labels:
+        # plot labels using matplotlib's text()
         n_labels = len(labels)
         n_features = len(poly_shapes)
         if n_labels != n_features:
@@ -61,6 +81,13 @@ def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None,
 
 def plot_points(ax, points, markersize, marker='o', color=None, labels=None, label_fontsize=7, label_color=None,
                 label_draw_duplicates=False, **kwargs):
+    """
+    Plot points `points` (either list of Point objects or NumPy coordinate array) on matplotlib Axes object `ax` with
+    marker size `markersize`. Define marker style with parameters `marker` and `color`. Optionally supply a list of
+    labels `labels` that will be displayed next to the respective point using the styling options `label_fontsize` and
+    `label_color`. All color parameters can also be a sequence.
+    Additional parameters can be passed to matplotlib's `scatter` function as `kwargs`.
+    """
     if not isinstance(points, np.ndarray):
         coords = points_to_coords(points)
     else:
@@ -69,6 +96,7 @@ def plot_points(ax, points, markersize, marker='o', color=None, labels=None, lab
     ax.scatter(coords[:, 0], coords[:, 1], s=markersize, marker=marker, color=color, **kwargs)
 
     if labels:
+        # plot labels using matplotlib's text()
         n_labels = len(labels)
         n_features = len(coords)
         if n_labels != n_features:
@@ -93,6 +121,15 @@ def plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, points, 
                                            plot_area_opts=None,
                                            plot_voronoi_opts=None,
                                            plot_points_opts=None):
+    """
+    All-in-one function to plot Voronoi region polygons `poly_shapes` and the respective points `points` inside a
+    geographic area `area_shape` on a matplotlib Axes object `ax`. By default, the regions will be blue and the points
+    black. Optionally pass `poly_to_pt_assignments` to show Voronoi regions and their respective points with the same
+    color (which is randomly drawn from color map `voronoi_and_points_cmap`). Labels for Voronoi regions can be passed
+    as `voronoi_labels`. Labels for points can be passed as `point_labels`. Use style options to customize the plot.
+    Pass additional (matplotlib) parameters to the individual plotting steps as `plot_area_opts`, `plot_voronoi_opts` or
+    `plot_points_opts` respectively.
+    """
     plot_area_opts = plot_area_opts or {}
     plot_voronoi_opts = plot_voronoi_opts or {'alpha': 0.5}
     plot_points_opts = plot_points_opts or {}
@@ -117,6 +154,7 @@ def plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, points, 
 
 
 def _color_for_labels(label_color, default_color, seq_index):
+    """Helper function to get a color for a label with index `seq_index`."""
     if label_color is None:
         if hasattr(default_color, '__getitem__'):
             c = default_color[seq_index]

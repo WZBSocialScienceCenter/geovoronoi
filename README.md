@@ -1,4 +1,7 @@
-# geovoronoi – a package to create and plot Voronoi regions in geographic areas 
+# geovoronoi – a package to create and plot Voronoi regions in geographic areas
+
+Markus Konrad <markus.konrad@wzb.eu>, Feb./ March 2018
+
 
 ## Limitations
 

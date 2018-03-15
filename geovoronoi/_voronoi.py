@@ -11,7 +11,7 @@ import logging
 import numpy as np
 from scipy.spatial import Voronoi
 from scipy.spatial.distance import cdist
-from shapely.geometry import MultiPolygon, LineString, asPoint
+from shapely.geometry import LineString, asPoint
 from shapely.ops import polygonize, cascaded_union
 
 from ._geom import polygon_around_center
@@ -22,10 +22,12 @@ logger.addHandler(logging.NullHandler())
 
 
 def coords_to_points(coords):
+    """Convert a NumPy array of 2D coordinates `coords` to a list of shapely Point objects"""
     return list(map(asPoint, coords))
 
 
 def points_to_coords(pts):
+    """Convert a list of shapely Point objects to a NumPy array of 2D coordinates `coords`"""
     return np.array([p.coords[0] for p in pts])
 
 
@@ -33,6 +35,25 @@ def voronoi_regions_from_coords(coords, geo_shape,
                                 shapes_from_diff_with_min_area=None,
                                 accept_n_coord_duplicates=None,
                                 return_unassigned_points=False):
+    """
+    Calculate Voronoi regions from NumPy array of 2D coordinates `coord` that lie within a shape `geo_shape`. Setting
+    `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully cover `geo_shape`. Set this
+    to a small number that indicates the minimum valid area of "fill up" Voronoi region shapes.
+    Set `accept_n_coord_duplicates` to accept exactly this number of points with exactly the same coordinates. Such
+    duplicates will belong to the same Voronoi region. If set to `None` then any number of duplicate coordinates is
+    accepted. Set `return_unassigned_points` to True to additionally return a list of shapely Point objects that could
+    not be assigned to any Voronoi region.
+
+    This function returns the following values in a tuple:
+    1. `poly_shapes`: a list of shapely Polygon/MultiPolygon objects that represent the generated Voronoi regions
+    2. `points`: the input coordinates converted to a list of shapely Point objects
+    3. `poly_to_pt_assignments`: a nested list that for each Voronoi region in `poly_shapes` contains a list of indices
+       into `points` (or `coords`) that represent the points that belong to this Voronoi region. Usually, this is only
+       a single point. However, in case of duplicate points (e.g. both or more points have exactly the same coordinates)
+       then all these duplicate points are listed for the respective Voronoi region.
+    4. optional if `return_unassigned_points` is True: a list of points that could not be assigned to any Voronoi region
+    """
+
     logger.info('running Voronoi tesselation for %d points' % len(coords))
     vor = Voronoi(coords)
     logger.info('generated %d Voronoi regions' % (len(vor.regions)-1))
@@ -59,14 +80,14 @@ def voronoi_regions_from_coords(coords, geo_shape,
 
 def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
     """
-    Takes a scipy Voronoi result object `vor` (see [1]) and a shapely Polygon `hull_shape` the represents the geographic
+    Takes a scipy Voronoi result object `vor` (see [1]) and a shapely Polygon `geo_shape` the represents the geographic
     area in which the Voronoi regions shall be placed. Calculates the following three lists:
     1. Polygon lines of the Voronoi regions. These can be used to generate all Voronoi region polygons via
-       `assign_points_to_voronoi_polygons`.
+       `polygon_shapes_from_voronoi_lines`.
     2. Loose ridges of Voronoi regions.
     3. Far points of loose ridges of Voronoi regions.
 
-    If `return_only_poly_lines` is True, only the first list is returned, otherwise a tuple of all thress lists is
+    If `return_only_poly_lines` is True, only the first list is returned, otherwise a tuple of all three lists is
     returned.
 
     Calculation of Voronoi region polygon lines taken and adopted from [2].
@@ -124,9 +145,6 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
     if not far_points_hull.contains(geo_shape):   # if that's the case, merge it by taking the union
         far_points_hull = far_points_hull.union(geo_shape)
 
-    # vor_mpoly = MultiPolygon([p for p in polygonize(poly_lines)])
-    # far_points_hull = far_points_hull.union(vor_mpoly)
-
     # now add the lines that make up `far_points_hull` to the final `poly_lines` list
     far_points_hull_coords = far_points_hull.exterior.coords
     for i, pt in list(enumerate(far_points_hull_coords))[1:]:
@@ -145,20 +163,27 @@ def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None, shapes_from_di
     [`polygonize`](http://toblerity.org/shapely/manual.html#shapely.ops.polygonize). If `geo_shape` is not None, then
     the intersection between any generated polygon and `geo_shape` is taken in case they overlap (i.e. the Voronoi
     regions at the border are "cut" to the `geo_shape` polygon that represents the geographic area holding the
-    Voronoi regions).
+    Voronoi regions). Setting `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully
+    cover `geo_shape`. Set this to a small number that indicates the minimum valid area of "fill up" Voronoi region
+    shapes.
     Returns a list of shapely Polygons objects.
     """
+
+    # generate shapely Polygon objects from the LineStrings of the Voronoi shapes in `poly_lines`
     poly_shapes = []
     for p in polygonize(poly_lines):
-        if geo_shape is not None and not geo_shape.contains(p):
-            p = p.intersection(geo_shape)
+        if geo_shape is not None and not geo_shape.contains(p):    # if `geo_shape` contains polygon `p`,
+            p = p.intersection(geo_shape)                          # intersect it with `geo_shape` (i.e. "cut" it)
 
         poly_shapes.append(p)
 
     if geo_shape is not None and shapes_from_diff_with_min_area is not None:
-        vor_polys_union = cascaded_union(poly_shapes)
-        diff = np.array(geo_shape.difference(vor_polys_union), dtype=object)
-        diff_areas = np.array([p.area for p in diff])
+        # fix rare cases where the generated polygons of the Voronoi regions don't fully cover `geo_shape`
+        vor_polys_union = cascaded_union(poly_shapes)   # union of Voronoi regions
+        diff = np.array(geo_shape.difference(vor_polys_union), dtype=object)    # "gaps"
+        diff_areas = np.array([p.area for p in diff])    # areas of "gaps"
+        # use only those "gaps" bigger than `shapes_from_diff_with_min_area` because very tiny areas are generated
+        # at the borders due to floating point errors
         poly_shapes.extend(diff[diff_areas >= shapes_from_diff_with_min_area])
 
     return poly_shapes
@@ -175,10 +200,15 @@ def assign_points_to_voronoi_polygons(points, poly_shapes,
     Normally, 1-to-1 assignments are expected, i.e. for each Voronoi region in `poly_shapes` there's exactly one point
     in `points` belonging to this Voronoi region. However, if there are duplicate coordinates in `points`, then those
     duplicates will be assigned together to their Voronoi region and hence there is a 1-to-n relationship between
-    Voronoi regions and points. If `accept_n_coord_duplicates` is set to None, then an anunspecified number of duplicates
-    are generally allowed. If `accept_n_coord_duplicates` is 0, then no point duplicates are allowed, otherwise
+    Voronoi regions and points. If `accept_n_coord_duplicates` is set to None, then an an unspecified number of
+    duplicates are allowed. If `accept_n_coord_duplicates` is 0, then no point duplicates are allowed, otherwise
     exactly `accept_n_coord_duplicates` duplicates are allowed.
+    Set `return_unassigned_points` to additionally return a list of points that could not be assigned to any Voronoi
+    region. `coords` can be passed in order to avoid another conversion from Point objects to NumPy coordinate array.
     """
+
+    # do some checks first
+
     n_polys = len(poly_shapes)
     n_points = len(points)
 
@@ -202,19 +232,22 @@ def assign_points_to_voronoi_polygons(points, poly_shapes,
         raise ValueError('Unexpected number of geo-coordinates: %d (got %d polygons and expected %d geo-coordinates)' %
                          (n_points, n_polys, expected_n_geocoords))
 
+    # get the Voronoi regions' centroids and calculate the distance between all centroid – input coordinate pairs
     poly_centroids = np.array([p.centroid.coords[0] for p in poly_shapes])
     poly_pt_dists = cdist(poly_centroids, coords)
 
+    # generate the assignments
     assignments = []
     n_assigned_dupl = 0
     for i_poly, vor_poly in enumerate(poly_shapes):
+        # indices to points sorted by distance to this Voronoi region's centroid
         closest_pt_indices = np.argsort(poly_pt_dists[i_poly])
         assigned_pts = []
         n_assigned = len(assigned_pts)
-        for i_pt in closest_pt_indices:
+        for i_pt in closest_pt_indices:      # check each point with increasing distance
             pt = points[i_pt]
 
-            if pt.intersects(vor_poly):
+            if pt.intersects(vor_poly):      # if this point is inside this Voronoi region, assign it to the region
                 assigned_pts.append(i_pt)
                 if n_assigned >= accept_n_coord_duplicates - n_assigned_dupl:
                     break
@@ -226,8 +259,11 @@ def assign_points_to_voronoi_polygons(points, poly_shapes,
             raise RuntimeError('No duplicate points allowed but polygon %d contains several points: %s'
                                % (i_poly, str(assigned_pts)))
 
+        # add the assignments for this Voronoi region
         assignments.append(assigned_pts)
         n_assigned_dupl += len(assigned_pts)-1
+
+    # make some final checks
 
     assert len(assignments) == len(poly_shapes)
 
@@ -247,7 +283,10 @@ def assign_points_to_voronoi_polygons(points, poly_shapes,
 
 
 def get_points_to_poly_assignments(poly_to_pt_assignments):
-    """Reverse of poly to points assignments"""
+    """
+    Reverse of poly to points assignments: Returns a list of size N, which is the number of points in
+    `poly_to_pt_assignments`. Each list element is a index into the list of Voronoi regions.
+    """
     pt_poly = [(i_pt, i_vor)
                for i_vor, pt_indices in enumerate(poly_to_pt_assignments)
                for i_pt in pt_indices]
