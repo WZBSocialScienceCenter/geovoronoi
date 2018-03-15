@@ -1,13 +1,12 @@
-from math import pi
+from math import pi, isclose
 from functools import partial
 from itertools import permutations
 
-import pytest
 import hypothesis.strategies as st
 from hypothesis import given
 import numpy as np
 
-from geovoronoi._geom import angle_between_pts, inner_angle_between_vecs, polygon_around_center
+from geovoronoi._geom import angle_between_pts, inner_angle_between_vecs, polygon_around_center, calculate_polygon_areas
 
 # hypothesis generator shortcuts
 real_floats = partial(st.floats, allow_nan=False, allow_infinity=False)
@@ -63,3 +62,24 @@ def test_polygon_around_center_given_center_is_one_of_points():
         poly = polygon_around_center(points[perm_ind,:], center=(0.5, 0.5))
 
         assert poly.is_simple and poly.is_valid
+
+
+def test_calculate_polygon_areas_empty():
+    areas = calculate_polygon_areas([])
+    assert len(areas) == 0
+
+
+def test_calculate_polygon_areas_world():
+    import geopandas as gpd
+
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    world = world[world.continent != 'Antarctica'].to_crs(epsg=3395)  # meters as unit!
+
+    areas = calculate_polygon_areas(world.geometry)
+
+    assert len(areas) == len(world)
+    assert all(0 <= a < 9e13 for a in areas)
+
+    areas_km2 = calculate_polygon_areas(world.geometry, m2_to_km2=True)
+    assert len(areas_km2) == len(world)
+    assert all(isclose(a_m, a_km * 1e6) for a_m, a_km in zip(areas, areas_km2))
