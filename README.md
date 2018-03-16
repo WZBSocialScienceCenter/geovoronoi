@@ -4,7 +4,7 @@ Markus Konrad <markus.konrad@wzb.eu>, Feb./ March 2018
 
 ## Overview
 
-![https://raw.githubusercontent.com/WZBSocialScienceCenter/geovoronoi/master/examples/random_points_and_area.png](Voronoi regions of random points across Spain and their respective area)
+![Voronoi regions of random points across Spain and their respective area](https://raw.githubusercontent.com/WZBSocialScienceCenter/geovoronoi/master/examples/random_points_and_area.png)
 
 *geovoronoi* helps generating [Voronoi regions](https://en.wikipedia.org/wiki/Voronoi_diagram) for geographic data, for example coordinates of public universities in a certain country. This in turn may be used to estimate some kind of "coverage".
 
@@ -81,7 +81,7 @@ plt.show()
 
 This would be an example output (see "Limitations" below for the issue of the regions in Sardinia):
 
-![https://raw.githubusercontent.com/WZBSocialScienceCenter/geovoronoi/master/examples/random_points_across_italy.png](Voronoi regions of random points across Italy)
+![Voronoi regions of random points across Italy](https://raw.githubusercontent.com/WZBSocialScienceCenter/geovoronoi/master/examples/random_points_across_italy.png)
 
 See the full example source code in [examples/random_points_across_italy.py](examples/random_points_across_italy.py). See also the other examples in the [examples/](examples) directory that show how to calculate the area of the Voronoi regions, handle duplicate points or interact with GeoPandas. 
 
