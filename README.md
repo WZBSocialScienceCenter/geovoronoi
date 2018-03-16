@@ -12,7 +12,7 @@ It takes a list of coordinates and calculates the Voronoi regions from them usin
 
 ## Installation
 
-This package is available on [PyPI](). You can install the latest version via *pip* as follows:
+This package is available on [PyPI](https://pypi.org/project/geovoronoi/). You can install the latest version via *pip* as follows:
 
 ```
 # install with "plotting" dependencies (recommended):
@@ -106,4 +106,4 @@ See the full example source code in [examples/random_points_across_italy.py](exa
 
 ## License
 
-Licensed under [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See `LICENSE` file. 
+Licensed under [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See `LICENSE.txt` file. 

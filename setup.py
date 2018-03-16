@@ -6,6 +6,7 @@ from setuptools import setup
 
 import geovoronoi
 
+GITHUB_URL = 'https://github.com/WZBSocialScienceCenter/geovoronoi'
 
 setup(
     name=geovoronoi.__title__,
@@ -14,8 +15,11 @@ setup(
     long_description="""geovoronoi is a small Python 3 package that uses SciPy to generate Voronoi regions for a given
 set of points in a given geographic area. It then allows to intersect the geographic area with these Voronoi regions so
 that they are limited to the geographic area. Furthermore, functions to visualize the results are implemented.""",
-    url='https://github.com/WZBSocialScienceCenter/geovoronoi',
-
+    url=GITHUB_URL,
+    project_urls={
+        'Source': GITHUB_URL,
+        'Tracker': 'https://github.com/WZBSocialScienceCenter/geovoronoi' + '/issues',
+    },
     author='Markus Konrad',
     author_email='markus.konrad@wzb.eu',
 
@@ -39,7 +43,7 @@ that they are limited to the geographic area. Furthermore, functions to visualiz
         'Topic :: Utilities',
     ],
 
-    keywords='voronoi tesselation gis geographic area',
+    keywords='voronoi tesselation gis geographic area visualization plotting',
 
     packages=['geovoronoi'],
     # include_package_data=True,
