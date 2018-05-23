@@ -15,4 +15,4 @@ hypothesis = "==3.45.2"
 pytest = "==3.4.1"
 
 [requires]
-python_version = ">=3.5"
+python_version = ">=3.4"
