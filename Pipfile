@@ -1,0 +1,18 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+geopandas = "==0.3.0"
+matplotlib = "==2.1.2"
+numpy = "==1.14.1"
+scipy = "==1.0.0"
+Shapely = "==1.6.3"
+
+[dev-packages]
+hypothesis = "==3.45.2"
+pytest = "==3.4.1"
+
+[requires]
+python_version = ">=3.5"
