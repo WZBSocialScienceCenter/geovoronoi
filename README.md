@@ -1,6 +1,6 @@
 # geovoronoi – a package to create and plot Voronoi regions inside geographic areas
 
-Markus Konrad <markus.konrad@wzb.eu>, Feb./ March 2018
+Markus Konrad <markus.konrad@wzb.eu>, July 2019
 
 ## Overview
 
@@ -94,6 +94,7 @@ See the full example source code in [examples/random_points_across_italy.py](exa
 * shapely
 * matplotlib (only necessary for plotting)
 * geopandas (only necessary for plotting)
+* descartes (only necessary for plotting)
 
 ## Limitations
 
@@ -107,3 +108,4 @@ See the full example source code in [examples/random_points_across_italy.py](exa
 ## License
 
 Licensed under [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See `LICENSE.txt` file. 
+

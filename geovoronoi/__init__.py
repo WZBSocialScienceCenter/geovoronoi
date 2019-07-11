@@ -15,6 +15,6 @@ from ._geom import calculate_polygon_areas
 
 
 __title__ = 'geovoronoi'
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 __author__ = 'Markus Konrad'
 __license__ = 'Apache License 2.0'

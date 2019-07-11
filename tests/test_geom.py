@@ -9,7 +9,7 @@ import numpy as np
 from geovoronoi._geom import angle_between_pts, inner_angle_between_vecs, polygon_around_center, calculate_polygon_areas
 
 # hypothesis generator shortcuts
-real_floats = partial(st.floats, allow_nan=False, allow_infinity=False)
+real_floats = partial(st.floats, allow_nan=False, allow_infinity=False, width=32)
 real_coords_2d = partial(st.lists, elements=real_floats(), min_size=2, max_size=2)
 
 
@@ -21,7 +21,7 @@ def test_inner_angle_between_vecs(a, b):
 
     ang = inner_angle_between_vecs(a, b)
 
-    if np.allclose(a, origin) or np.allclose(b, origin):
+    if np.allclose(a, origin, rtol=0) or np.allclose(b, origin, rtol=0):
         assert np.isnan(ang)
     else:
         assert 0 <= ang <= pi
@@ -34,7 +34,7 @@ def test_angle_between_pts(a, b):
 
     ang = angle_between_pts(a, b)
 
-    if np.allclose(a, b):
+    if np.allclose(a, b, rtol=0):
         assert np.isnan(ang)
     else:
         assert 0 <= ang <= 2*pi

@@ -10,6 +10,7 @@ Author: Markus Konrad <markus.konrad@wzb.eu>
 import numpy as np
 import matplotlib.pyplot as plt
 from geopandas.plotting import _flatten_multi_geoms
+from geopandas import GeoSeries
 
 from ._voronoi import points_to_coords, get_points_to_poly_assignments
 
@@ -198,7 +199,10 @@ def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
     from descartes.patch import PolygonPatch
     from matplotlib.collections import PatchCollection
 
-    if type(color) in (list, tuple):
+    if not isinstance(geoms, GeoSeries):
+        geoms = GeoSeries(geoms)
+
+    if isinstance(color, (list, tuple)):
         geoms, color = _flatten_multi_geoms(geoms, color)
     else:
         geoms, _ = _flatten_multi_geoms(geoms)

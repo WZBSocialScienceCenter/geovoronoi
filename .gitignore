@@ -7,3 +7,4 @@ tests/.pytest_cache
 build/
 dist/
 geovoronoi.egg-info/
+.hypothesis/

@@ -2,19 +2,26 @@
 geovoronoi setuptools based setup module
 """
 
+import os
 from setuptools import setup
 
 import geovoronoi
 
 GITHUB_URL = 'https://github.com/WZBSocialScienceCenter/geovoronoi'
 
+
+here = os.path.abspath(os.path.dirname(__file__))
+
+# Get the long description from the README file
+with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
+
 setup(
     name=geovoronoi.__title__,
     version=geovoronoi.__version__,
     description='a package to create and plot Voronoi regions in geographic areas',
-    long_description="""geovoronoi is a small Python 3 package that uses SciPy to generate Voronoi regions for a given
-set of points in a given geographic area. It then allows to intersect the geographic area with these Voronoi regions so
-that they are limited to the geographic area. Furthermore, functions to visualize the results are implemented.""",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     url=GITHUB_URL,
     project_urls={
         'Source': GITHUB_URL,
@@ -37,6 +44,7 @@ that they are limited to the geographic area. Furthermore, functions to visualiz
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
 
         'Topic :: Scientific/Engineering :: Information Analysis',
         'Topic :: Software Development :: Libraries :: Python Modules',
@@ -50,6 +58,6 @@ that they are limited to the geographic area. Furthermore, functions to visualiz
     python_requires='>=3.4',
     install_requires=['numpy>=1.11.0', 'scipy>=0.12.0', 'shapely>=1.6.0'],
     extras_require={
-        'plotting': ['matplotlib>=2.1.0', 'geopandas>=0.3.0'],
+        'plotting': ['matplotlib>=2.1.0', 'geopandas>=0.5.0', 'descartes>=1.1.0'],
     }
 )
