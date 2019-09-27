@@ -11,7 +11,7 @@ import logging
 import numpy as np
 from scipy.spatial import Voronoi
 from scipy.spatial.distance import cdist
-from shapely.geometry import LineString, asPoint
+from shapely.geometry import LineString, asPoint, MultiPoint
 from shapely.ops import polygonize, cascaded_union
 
 from ._geom import polygon_around_center
@@ -100,7 +100,7 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
     xrange = xmax - xmin
     yrange = ymax - ymin
     max_dim_extend = max(xrange, yrange)
-    center = np.array(geo_shape.centroid)
+    center = np.array(MultiPoint(vor.points).convex_hull.centroid)
 
     # generate lists of full polygon lines, loose ridges and far points of loose ridges from scipy Voronoi result object
     poly_lines = []
