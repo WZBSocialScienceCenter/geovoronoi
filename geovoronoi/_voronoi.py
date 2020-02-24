@@ -11,7 +11,7 @@ import logging
 import numpy as np
 from scipy.spatial import Voronoi
 from scipy.spatial.distance import cdist
-from shapely.geometry import LineString, asPoint, MultiPoint
+from shapely.geometry import LineString, asPoint, MultiPoint, MultiPolygon
 from shapely.ops import polygonize, cascaded_union
 
 from ._geom import polygon_around_center
@@ -78,7 +78,7 @@ def voronoi_regions_from_coords(coords, geo_shape,
         return poly_shapes, points, poly_to_pt_assignments
 
 
-def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
+def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farpoints_max_extend_factor=10):
     """
     Takes a scipy Voronoi result object `vor` (see [1]) and a shapely Polygon `geo_shape` the represents the geographic
     area in which the Voronoi regions shall be placed. Calculates the following three lists:
@@ -99,7 +99,7 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
     xmin, ymin, xmax, ymax = geo_shape.bounds
     xrange = xmax - xmin
     yrange = ymax - ymin
-    max_dim_extend = max(xrange, yrange)
+    max_dim_extend = max(xrange, yrange) * farpoints_max_extend_factor
     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
 
     # generate lists of full polygon lines, loose ridges and far points of loose ridges from scipy Voronoi result object
@@ -123,7 +123,7 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
             far_point = vor.vertices[i] + direction * max_dim_extend
 
             loose_ridges.append(LineString(np.vstack((vor.vertices[i], far_point))))
-            far_points.append(far_point)
+            far_points.append(tuple(far_point))
 
     #
     # confine the infinite Voronoi regions by constructing a "hull" from loose ridge far points around the centroid of
@@ -135,15 +135,19 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True):
         poly_lines.append(l)
 
     # now create the "hull" of far points: `far_points_hull`
+    # make sure this hull completely encompasses the geographic area `geo_shape`, too
+    if isinstance(geo_shape, MultiPolygon):
+        geo_shape_polys = geo_shape.geoms
+    else:
+        geo_shape_polys = [geo_shape]
+    for poly in geo_shape_polys:
+        far_points.extend(poly.exterior.coords)
+
     far_points = np.array(far_points)
     far_points_hull = polygon_around_center(far_points, center)
 
     if far_points_hull is None:
         raise RuntimeError('no polygonal hull of far points could be created')
-
-    # sometimes, this hull does not completely encompass the geographic area `geo_shape`
-    if not far_points_hull.contains(geo_shape):   # if that's the case, merge it by taking the union
-        far_points_hull = far_points_hull.union(geo_shape)
 
     # now add the lines that make up `far_points_hull` to the final `poly_lines` list
     far_points_hull_coords = far_points_hull.exterior.coords
@@ -175,7 +179,8 @@ def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None, shapes_from_di
         if geo_shape is not None and not geo_shape.contains(p):    # if `geo_shape` contains polygon `p`,
             p = p.intersection(geo_shape)                          # intersect it with `geo_shape` (i.e. "cut" it)
 
-        poly_shapes.append(p)
+        if not p.is_empty:
+            poly_shapes.append(p)
 
     if geo_shape is not None and shapes_from_diff_with_min_area is not None:
         # fix rare cases where the generated polygons of the Voronoi regions don't fully cover `geo_shape`
