@@ -34,7 +34,8 @@ def points_to_coords(pts):
 def voronoi_regions_from_coords(coords, geo_shape,
                                 shapes_from_diff_with_min_area=None,
                                 accept_n_coord_duplicates=None,
-                                return_unassigned_points=False):
+                                return_unassigned_points=False,
+                                farpoints_max_extend_factor=2):
     """
     Calculate Voronoi regions from NumPy array of 2D coordinates `coord` that lie within a shape `geo_shape`. Setting
     `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully cover `geo_shape`. Set this
@@ -45,6 +46,7 @@ def voronoi_regions_from_coords(coords, geo_shape,
     not be assigned to any Voronoi region.
 
     This function returns the following values in a tuple:
+
     1. `poly_shapes`: a list of shapely Polygon/MultiPolygon objects that represent the generated Voronoi regions
     2. `points`: the input coordinates converted to a list of shapely Point objects
     3. `poly_to_pt_assignments`: a nested list that for each Voronoi region in `poly_shapes` contains a list of indices
@@ -52,6 +54,10 @@ def voronoi_regions_from_coords(coords, geo_shape,
        a single point. However, in case of duplicate points (e.g. both or more points have exactly the same coordinates)
        then all these duplicate points are listed for the respective Voronoi region.
     4. optional if `return_unassigned_points` is True: a list of points that could not be assigned to any Voronoi region
+
+    When calculating the far points of loose ridges for the Voronoi regions, `farpoints_max_extend_factor` is the
+    factor that is multiplied with the maximum extend per dimension. Increase this number in case the hull of far points
+    doesn't intersect with `geo_shape`.
     """
 
     logger.info('running Voronoi tesselation for %d points' % len(coords))
@@ -59,7 +65,7 @@ def voronoi_regions_from_coords(coords, geo_shape,
     logger.info('generated %d Voronoi regions' % (len(vor.regions)-1))
 
     logger.info('generating Voronoi polygon lines')
-    poly_lines = polygon_lines_from_voronoi(vor, geo_shape)
+    poly_lines = polygon_lines_from_voronoi(vor, geo_shape, farpoints_max_extend_factor=farpoints_max_extend_factor)
 
     logger.info('generating Voronoi polygon shapes')
     poly_shapes = polygon_shapes_from_voronoi_lines(poly_lines, geo_shape,
@@ -78,10 +84,11 @@ def voronoi_regions_from_coords(coords, geo_shape,
         return poly_shapes, points, poly_to_pt_assignments
 
 
-def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farpoints_max_extend_factor=10):
+def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farpoints_max_extend_factor=2):
     """
     Takes a scipy Voronoi result object `vor` (see [1]) and a shapely Polygon `geo_shape` the represents the geographic
     area in which the Voronoi regions shall be placed. Calculates the following three lists:
+
     1. Polygon lines of the Voronoi regions. These can be used to generate all Voronoi region polygons via
        `polygon_shapes_from_voronoi_lines`.
     2. Loose ridges of Voronoi regions.
@@ -89,6 +96,10 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farp
 
     If `return_only_poly_lines` is True, only the first list is returned, otherwise a tuple of all three lists is
     returned.
+
+    When calculating the far points of loose ridges, `farpoints_max_extend_factor` is the factor that is multiplied
+    with the maximum extend per dimension. Increase this number in case the hull of far points doesn't intersect
+    with `geo_shape`.
 
     Calculation of Voronoi region polygon lines taken and adopted from [2].
 
@@ -99,7 +110,7 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farp
     xmin, ymin, xmax, ymax = geo_shape.bounds
     xrange = xmax - xmin
     yrange = ymax - ymin
-    max_dim_extend = max(xrange, yrange) * farpoints_max_extend_factor
+    max_dim_extend = max(xrange, yrange)
     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
 
     # generate lists of full polygon lines, loose ridges and far points of loose ridges from scipy Voronoi result object
@@ -120,7 +131,9 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farp
             midpoint = vor.points[pointidx].mean(axis=0)
             direction = np.sign(np.dot(midpoint - center, n)) * n
             direction = direction / np.linalg.norm(direction)   # to unit vector
-            far_point = vor.vertices[i] + direction * max_dim_extend
+
+            dist_center = np.linalg.norm(vor.vertices[i] - center)
+            far_point = vor.vertices[i] + direction * max(max_dim_extend, dist_center) * farpoints_max_extend_factor
 
             loose_ridges.append(LineString(np.vstack((vor.vertices[i], far_point))))
             far_points.append(far_point)
