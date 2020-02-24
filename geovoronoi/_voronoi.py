@@ -11,7 +11,7 @@ import logging
 import numpy as np
 from scipy.spatial import Voronoi
 from scipy.spatial.distance import cdist
-from shapely.geometry import LineString, asPoint, MultiPoint, MultiPolygon
+from shapely.geometry import LineString, asPoint, MultiPoint, Polygon
 from shapely.ops import polygonize, cascaded_union
 
 from ._geom import polygon_around_center
@@ -123,7 +123,7 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farp
             far_point = vor.vertices[i] + direction * max_dim_extend
 
             loose_ridges.append(LineString(np.vstack((vor.vertices[i], far_point))))
-            far_points.append(tuple(far_point))
+            far_points.append(far_point)
 
     #
     # confine the infinite Voronoi regions by constructing a "hull" from loose ridge far points around the centroid of
@@ -135,19 +135,19 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farp
         poly_lines.append(l)
 
     # now create the "hull" of far points: `far_points_hull`
-    # make sure this hull completely encompasses the geographic area `geo_shape`, too
-    if isinstance(geo_shape, MultiPolygon):
-        geo_shape_polys = geo_shape.geoms
-    else:
-        geo_shape_polys = [geo_shape]
-    for poly in geo_shape_polys:
-        far_points.extend(poly.exterior.coords)
-
     far_points = np.array(far_points)
     far_points_hull = polygon_around_center(far_points, center)
 
     if far_points_hull is None:
         raise RuntimeError('no polygonal hull of far points could be created')
+
+    # sometimes, this hull does not completely encompass the geographic area `geo_shape`
+    if not far_points_hull.contains(geo_shape):   # if that's the case, merge it by taking the union
+        far_points_hull = far_points_hull.union(geo_shape)
+
+    if not isinstance(far_points_hull, Polygon):
+        raise RuntimeError('hull of far points is not Polygon as it should be; try increasing '
+                           '`farpoints_max_extend_factor`')
 
     # now add the lines that make up `far_points_hull` to the final `poly_lines` list
     far_points_hull_coords = far_points_hull.exterior.coords
