@@ -7,6 +7,7 @@ Author: Markus Konrad <markus.konrad@wzb.eu>
 """
 
 import logging
+from collections import defaultdict
 
 import numpy as np
 from scipy.spatial import Voronoi
@@ -35,7 +36,7 @@ def voronoi_regions_from_coords(coords, geo_shape,
                                 shapes_from_diff_with_min_area=None,
                                 accept_n_coord_duplicates=None,
                                 return_unassigned_points=False,
-                                farpoints_max_extend_factor=2):
+                                farpoints_max_extend_factor=10):
     """
     Calculate Voronoi regions from NumPy array of 2D coordinates `coord` that lie within a shape `geo_shape`. Setting
     `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully cover `geo_shape`. Set this
@@ -84,7 +85,7 @@ def voronoi_regions_from_coords(coords, geo_shape,
         return poly_shapes, points, poly_to_pt_assignments
 
 
-def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farpoints_max_extend_factor=2):
+def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farpoints_max_extend_factor=10):
     """
     Takes a scipy Voronoi result object `vor` (see [1]) and a shapely Polygon `geo_shape` the represents the geographic
     area in which the Voronoi regions shall be placed. Calculates the following three lists:
@@ -107,10 +108,7 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farp
     [2]: https://github.com/scipy/scipy/blob/v1.0.0/scipy/spatial/_plotutils.py
     """
 
-    xmin, ymin, xmax, ymax = geo_shape.bounds
-    xrange = xmax - xmin
-    yrange = ymax - ymin
-    max_dim_extend = max(xrange, yrange)
+    max_dim_extend = vor.points.ptp(axis=0).max() * farpoints_max_extend_factor
     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
 
     # generate lists of full polygon lines, loose ridges and far points of loose ridges from scipy Voronoi result object
@@ -132,8 +130,7 @@ def polygon_lines_from_voronoi(vor, geo_shape, return_only_poly_lines=True, farp
             direction = np.sign(np.dot(midpoint - center, n)) * n
             direction = direction / np.linalg.norm(direction)   # to unit vector
 
-            dist_center = np.linalg.norm(vor.vertices[i] - center)
-            far_point = vor.vertices[i] + direction * max(max_dim_extend, dist_center) * farpoints_max_extend_factor
+            far_point = vor.vertices[i] + direction * max_dim_extend * farpoints_max_extend_factor
 
             loose_ridges.append(LineString(np.vstack((vor.vertices[i], far_point))))
             far_points.append(far_point)
@@ -256,6 +253,7 @@ def assign_points_to_voronoi_polygons(points, poly_shapes,
 
     # generate the assignments
     assignments = []
+    already_assigned = set()
     n_assigned_dupl = 0
     for i_poly, vor_poly in enumerate(poly_shapes):
         # indices to points sorted by distance to this Voronoi region's centroid
@@ -266,7 +264,10 @@ def assign_points_to_voronoi_polygons(points, poly_shapes,
             pt = points[i_pt]
 
             if pt.intersects(vor_poly):      # if this point is inside this Voronoi region, assign it to the region
+                if i_pt in already_assigned:
+                    raise RuntimeError('Point %d cannot be assigned to more than one voronoi region' % i_pt)
                 assigned_pts.append(i_pt)
+                already_assigned.add(i_pt)
                 if n_assigned >= accept_n_coord_duplicates - n_assigned_dupl:
                     break
 
@@ -288,11 +289,10 @@ def assign_points_to_voronoi_polygons(points, poly_shapes,
     if dupl_restricted:
         assert n_assigned_dupl == accept_n_coord_duplicates
         assert sum(map(len, assignments)) == len(poly_shapes) + accept_n_coord_duplicates
-        assert len(set(sum(assignments, []))) == n_points   # make sure all points were assigned
+        assert len(already_assigned) == n_points   # make sure all points were assigned
         unassigned_pt_indices = set()
     else:
-        assigned_pt_indices = set(sum(assignments, []))
-        unassigned_pt_indices = set(range(n_points)) - assigned_pt_indices
+        unassigned_pt_indices = set(range(n_points)) - already_assigned
 
     if return_unassigned_points:
         return assignments, unassigned_pt_indices
@@ -302,8 +302,8 @@ def assign_points_to_voronoi_polygons(points, poly_shapes,
 
 def get_points_to_poly_assignments(poly_to_pt_assignments):
     """
-    Reverse of poly to points assignments: Returns a list of size N, which is the number of points in
-    `poly_to_pt_assignments`. Each list element is a index into the list of Voronoi regions.
+    Reverse of poly to points assignments: Returns a list of size N, which is the number of unique points in
+    `poly_to_pt_assignments`. Each list element is an index into the list of Voronoi regions.
     """
     pt_poly = [(i_pt, i_vor)
                for i_vor, pt_indices in enumerate(poly_to_pt_assignments)
