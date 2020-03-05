@@ -1,6 +1,6 @@
 # geovoronoi – a package to create and plot Voronoi regions inside geographic areas
 
-Markus Konrad <markus.konrad@wzb.eu>, July 2019
+Markus Konrad <markus.konrad@wzb.eu>, March 2020
 
 ## Overview
 
@@ -87,7 +87,7 @@ See the full example source code in [examples/random_points_across_italy.py](exa
 
 ## Dependencies
 
-*geovoronoi* requires **Python 3.4 or newer**. The following packages need to be installed (if not, they will be automatically installed if you use a Python package manager like *pip*):
+*geovoronoi* requires **Python 3.6 or newer**. The following packages need to be installed (if not, they will be automatically installed if you use a Python package manager like *pip*):
 
 * NumPy
 * SciPy
