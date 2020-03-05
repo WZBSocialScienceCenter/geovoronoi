@@ -62,6 +62,6 @@ setup(
     extras_require={
         'plotting': ['matplotlib>=3.2.0', 'geopandas>=0.7.0', 'descartes>=1.1.0'],
         'test': ['pytest>=5.3.0', 'pytest-mpl>=0.11', 'hypothesis>=5.6.0', 'tox>=3.14.0'],
-        'develop': ['ipython>=7.0.0'],
+        'develop': ['ipython>=7.0.0', 'twine>=3.1.0'],
     }
 )
