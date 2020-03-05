@@ -5,10 +5,12 @@ geovoronoi setuptools based setup module
 import os
 from setuptools import setup
 
-import geovoronoi
-
 GITHUB_URL = 'https://github.com/WZBSocialScienceCenter/geovoronoi'
 
+__title__ = 'geovoronoi'
+__version__ = '0.2.0'
+__author__ = 'Markus Konrad'
+__license__ = 'Apache License 2.0'
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -17,8 +19,8 @@ with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name=geovoronoi.__title__,
-    version=geovoronoi.__version__,
+    name=__title__,
+    version=__version__,
     description='a package to create and plot Voronoi regions in geographic areas',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -55,9 +57,11 @@ setup(
 
     packages=['geovoronoi'],
     # include_package_data=True,
-    python_requires='>=3.4',
-    install_requires=['numpy>=1.11.0', 'scipy>=0.12.0', 'shapely>=1.6.0'],
+    python_requires='>=3.6',
+    install_requires=['numpy>=1.18.0', 'scipy>=1.4.0', 'shapely>=1.7.0'],
     extras_require={
-        'plotting': ['matplotlib>=2.1.0', 'geopandas>=0.5.0', 'descartes>=1.1.0'],
+        'plotting': ['matplotlib>=3.2.0', 'geopandas>=0.7.0', 'descartes>=1.1.0'],
+        'test': ['pytest>=5.3.0', 'pytest-mpl>=0.11', 'hypothesis>=5.6.0', 'tox>=3.14.0'],
+        'develop': ['ipython>=7.0.0'],
     }
 )

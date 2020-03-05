@@ -1,16 +1,11 @@
 from math import pi, isclose
-from functools import partial
 from itertools import permutations
 
-import hypothesis.strategies as st
 from hypothesis import given
 import numpy as np
 
+from ._testtools import real_coords_2d
 from geovoronoi._geom import angle_between_pts, inner_angle_between_vecs, polygon_around_center, calculate_polygon_areas
-
-# hypothesis generator shortcuts
-real_floats = partial(st.floats, allow_nan=False, allow_infinity=False, width=32)
-real_coords_2d = partial(st.lists, elements=real_floats(), min_size=2, max_size=2)
 
 
 @given(a=real_coords_2d(), b=real_coords_2d())

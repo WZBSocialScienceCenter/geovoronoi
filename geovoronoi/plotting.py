@@ -202,10 +202,10 @@ def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
     if not isinstance(geoms, GeoSeries):
         geoms = GeoSeries(geoms)
 
+    geoms, indices = _flatten_multi_geoms(geoms)
+
     if isinstance(color, (list, tuple)):
-        geoms, color = _flatten_multi_geoms(geoms, color)
-    else:
-        geoms, _ = _flatten_multi_geoms(geoms)
+        color = np.array(color)[indices]
 
     # PatchCollection does not accept some kwargs.
     if 'markersize' in kwargs:
