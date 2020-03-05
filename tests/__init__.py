@@ -1,0 +1,3 @@
+"""
+geovoronoi – automated tests
+"""
