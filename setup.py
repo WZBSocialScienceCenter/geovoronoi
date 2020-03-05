@@ -58,9 +58,10 @@ setup(
     packages=['geovoronoi'],
     # include_package_data=True,
     python_requires='>=3.6',
-    install_requires=['numpy>=1.18.0', 'scipy>=1.3.0', 'shapely>=1.7.0'],
+    install_requires=['numpy>=1.18.0', 'scipy>=1.4.0', 'shapely>=1.7.0'],
     extras_require={
         'plotting': ['matplotlib>=3.2.0', 'geopandas>=0.7.0', 'descartes>=1.1.0'],
         'test': ['pytest>=5.3.0', 'pytest-mpl>=0.11', 'hypothesis>=5.6.0'],
+        'develop': ['ipython>=7.0.0'],
     }
 )
