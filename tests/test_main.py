@@ -1,6 +1,7 @@
 import numpy as np
 import geopandas as gpd
 from shapely.geometry import Polygon, MultiPolygon
+from shapely.ops import cascaded_union
 import pytest
 from hypothesis import given
 
@@ -23,7 +24,7 @@ def test_voronoi_italy_with_plot():
     poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
 
     assert isinstance(poly_shapes, list)
-    assert 0 < len(poly_shapes) < 100
+    assert 0 < len(poly_shapes) <= 100
     assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
 
     assert np.array_equal(points_to_coords(pts), coords)
@@ -46,7 +47,7 @@ def test_voronoi_spain_area_with_plot():
     poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
 
     assert isinstance(poly_shapes, list)
-    assert 0 < len(poly_shapes) < 20
+    assert 0 < len(poly_shapes) <= 20
     assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
 
     assert np.array_equal(points_to_coords(pts), coords)
@@ -71,6 +72,42 @@ def test_voronoi_spain_area_with_plot():
 
     return fig
 
+
+@pytest.mark.mpl_image_compare
+def test_voronoi_geopandas():
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    cities = gpd.read_file(gpd.datasets.get_path('naturalearth_cities'))
+
+    # focus on South America, convert to World Mercator (unit: meters)
+    south_am = world[world.continent == 'South America'].to_crs(epsg=3395)
+    cities = cities.to_crs(south_am.crs)  # convert city coordinates to same CRS!
+
+    # create the bounding shape as union of all South American countries' shapes
+    south_am_shape = cascaded_union(south_am.geometry)
+    south_am_cities = cities[cities.geometry.within(south_am_shape)]  # reduce to cities in South America
+
+    # convert the pandas Series of Point objects to NumPy array of coordinates
+    coords = points_to_coords(south_am_cities.geometry)
+
+    # calculate the regions
+    poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, south_am_shape)
+
+    assert isinstance(poly_shapes, list)
+    assert 0 < len(poly_shapes) <= len(coords)
+    assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
+
+    assert np.array_equal(points_to_coords(pts), coords)
+
+    assert isinstance(poly_to_pt_assignments, list)
+    assert len(poly_to_pt_assignments) == len(poly_shapes)
+    assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
+    assert all([len(assign) == 1 for assign in poly_to_pt_assignments])   # in this case there is a 1:1 correspondance
+
+    fig, ax = subplot_for_map()
+
+    plot_voronoi_polys_with_points_in_area(ax, south_am_shape, poly_shapes, pts, poly_to_pt_assignments)
+
+    return fig
 
 
 def _get_country_shape(country):
