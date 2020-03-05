@@ -4,17 +4,58 @@ from shapely.geometry import Polygon, MultiPolygon
 from shapely.ops import cascaded_union
 import pytest
 from hypothesis import given
+import hypothesis.strategies as st
 
 from ._testtools import coords_2d_array
-from geovoronoi import voronoi_regions_from_coords, coords_to_points, points_to_coords, calculate_polygon_areas
+from geovoronoi import (
+    voronoi_regions_from_coords, coords_to_points, points_to_coords, calculate_polygon_areas,
+    get_points_to_poly_assignments
+)
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
 np.random.seed(123)
 
 
+#%% tests for individual functions
+
 @given(coords=coords_2d_array())
 def test_coords_to_points_and_points_to_coords(coords):
     assert np.array_equal(points_to_coords(coords_to_points(coords)), coords)
+
+
+@given(available_points=st.permutations(list(range(10))), n_poly=st.integers(0, 10))
+def test_get_points_to_poly_assignments(available_points, n_poly):
+    n_pts = len(available_points)
+    if n_poly == 0:
+        poly_to_pts = []
+    elif n_poly == 10:
+        poly_to_pts = [[x] for x in available_points]
+    else:
+        pts_per_poly = n_pts // n_poly
+        poly_to_pts = []
+        n_assigned = 0
+        for p in range(0, n_poly):
+            poly_to_pts.append([available_points[i] for i in range(p * pts_per_poly, (p+1) * pts_per_poly)])
+            n_assigned += pts_per_poly
+
+        if n_assigned < n_pts:
+            poly_to_pts[-1].extend([available_points[i] for i in range(n_assigned, n_pts)])
+
+    if n_poly > 0:
+        assert set(sum(poly_to_pts, [])) == set(available_points)
+
+    pts_to_poly = get_points_to_poly_assignments(poly_to_pts)
+
+    assert isinstance(pts_to_poly, list)
+
+    if n_poly == 0:
+        assert len(pts_to_poly) == 0
+    else:
+        assert len(pts_to_poly) == n_pts
+        assert all([0 <= i_poly < n_poly for i_poly in pts_to_poly])
+
+
+#%% realistic full tests with plotting
 
 
 @pytest.mark.mpl_image_compare
@@ -74,7 +115,7 @@ def test_voronoi_spain_area_with_plot():
 
 
 @pytest.mark.mpl_image_compare
-def test_voronoi_geopandas():
+def test_voronoi_geopandas_with_plot():
     world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
     cities = gpd.read_file(gpd.datasets.get_path('naturalearth_cities'))
 
@@ -109,6 +150,55 @@ def test_voronoi_geopandas():
 
     return fig
 
+
+@pytest.mark.mpl_image_compare
+def test_voronoi_sweden_duplicate_points_with_plot():
+    area_shape = _get_country_shape('Sweden')
+    coords = _rand_coords_in_shape(area_shape, 20)
+
+    # duplicate a few points
+    rand_dupl_ind = np.random.randint(len(coords), size=10)
+    coords = np.concatenate((coords, coords[rand_dupl_ind]))
+
+    poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape,
+                                                                           accept_n_coord_duplicates=10)
+
+    assert isinstance(poly_shapes, list)
+    assert 0 < len(poly_shapes) <= 20
+    assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
+
+    assert np.array_equal(points_to_coords(pts), coords)
+
+    assert isinstance(poly_to_pt_assignments, list)
+    assert len(poly_to_pt_assignments) == len(poly_shapes)
+    assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
+    assert all([0 < len(assign) <= 10 for assign in poly_to_pt_assignments])   # in this case there is not
+                                                                               # everywhere a 1:1 correspondance
+
+    pts_to_poly_assignments = np.array(get_points_to_poly_assignments(poly_to_pt_assignments))
+
+    # make point labels: counts of duplicates per points
+    count_per_pt = [sum(pts_to_poly_assignments == i_poly) for i_poly in pts_to_poly_assignments]
+    pt_labels = list(map(str, count_per_pt))
+
+    # highlight voronoi regions with point duplicates
+    count_per_poly = np.array(list(map(len, poly_to_pt_assignments)))
+    vor_colors = np.repeat('blue', len(poly_shapes))   # default color
+    vor_colors[count_per_poly > 1] = 'red'             # hightlight color
+
+    fig, ax = subplot_for_map()
+
+    plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords,
+                                           plot_voronoi_opts={'alpha': 0.2},
+                                           plot_points_opts={'alpha': 0.4},
+                                           voronoi_color=list(vor_colors),
+                                           point_labels=pt_labels,
+                                           points_markersize=np.array(count_per_pt)*10)
+
+    return fig
+
+
+#%% a few helper functions
 
 def _get_country_shape(country):
     world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
