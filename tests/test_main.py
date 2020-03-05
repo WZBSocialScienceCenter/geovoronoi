@@ -55,6 +55,54 @@ def test_get_points_to_poly_assignments(available_points, n_poly):
         assert all([0 <= i_poly < n_poly for i_poly in pts_to_poly])
 
 
+#%% tests against fixed issues
+
+def test_issue_7a():
+    centroids = np.array([[537300, 213400], [538700, 213700], [536100, 213400]])
+    polygon = Polygon([[540000, 214100], [535500, 213700], [535500, 213000], [539000, 213200]])
+    poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(centroids, polygon)
+
+    assert isinstance(poly_shapes, list)
+    assert 0 < len(poly_shapes) <= len(centroids)
+    assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
+
+    assert np.array_equal(points_to_coords(pts), centroids)
+
+    assert isinstance(poly_to_pt_assignments, list)
+    assert len(poly_to_pt_assignments) == len(poly_shapes)
+    assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
+    assert all([len(assign) == 1 for assign in poly_to_pt_assignments])   # in this case there is a 1:1 correspondance
+
+
+@pytest.mark.mpl_image_compare
+def test_issue_7b():
+    centroids = np.array([[496712, 232672], [497987, 235942], [496425, 230252], [497482, 234933],
+                          [499331, 238351], [496081, 231033], [497090, 233846], [496755, 231645],
+                          [498604, 237018]])
+    polygon = Polygon([[495555, 230875], [496938, 235438], [499405, 239403], [499676, 239474],
+                       [499733, 237877], [498863, 237792], [499120, 237335], [498321, 235010],
+                       [497295, 233185], [497237, 231359], [496696, 229620], [495982, 230047],
+                       [496154, 230347], [496154, 230347], [495555, 230875]])
+
+    poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(centroids, polygon)
+
+    assert isinstance(poly_shapes, list)
+    assert 0 < len(poly_shapes) <= len(centroids)
+    assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
+
+    assert np.array_equal(points_to_coords(pts), centroids)
+
+    assert isinstance(poly_to_pt_assignments, list)
+    assert len(poly_to_pt_assignments) == len(poly_shapes)
+    assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
+    assert all([len(assign) == 1 for assign in poly_to_pt_assignments])   # in this case there is a 1:1 correspondance
+
+    fig, ax = subplot_for_map()
+    plot_voronoi_polys_with_points_in_area(ax, polygon, poly_shapes, centroids, poly_to_pt_assignments)
+
+    return fig
+
+
 #%% realistic full tests with plotting
 
 
