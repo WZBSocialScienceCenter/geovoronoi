@@ -5,7 +5,7 @@ import pytest
 from hypothesis import given
 
 from ._testtools import coords_2d_array
-from geovoronoi import voronoi_regions_from_coords, coords_to_points, points_to_coords
+from geovoronoi import voronoi_regions_from_coords, coords_to_points, points_to_coords, calculate_polygon_areas
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
 np.random.seed(123)
@@ -37,6 +37,40 @@ def test_voronoi_italy_with_plot():
     plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords, poly_to_pt_assignments)
 
     return fig
+
+
+@pytest.mark.mpl_image_compare
+def test_voronoi_spain_area_with_plot():
+    area_shape = _get_country_shape('Spain')
+    coords = _rand_coords_in_shape(area_shape, 20)
+    poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
+
+    assert isinstance(poly_shapes, list)
+    assert 0 < len(poly_shapes) < 20
+    assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
+
+    assert np.array_equal(points_to_coords(pts), coords)
+
+    assert isinstance(poly_to_pt_assignments, list)
+    assert len(poly_to_pt_assignments) == len(poly_shapes)
+    assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
+    assert all([len(assign) == 1 for assign in poly_to_pt_assignments])   # in this case there is a 1:1 correspondance
+
+    poly_areas = calculate_polygon_areas(poly_shapes, m2_to_km2=True)  # converts m² to km²
+    assert isinstance(poly_areas, np.ndarray)
+    assert np.issubdtype(poly_areas.dtype, np.float_)
+    assert len(poly_areas) == len(poly_shapes)
+    assert np.all(poly_areas > 0)
+
+    fig, ax = subplot_for_map(show_x_axis=True, show_y_axis=True)
+
+    voronoi_labels = ['%d km²' % round(a) for a in poly_areas]
+    plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords, poly_to_pt_assignments,
+                                           voronoi_labels=voronoi_labels, voronoi_label_fontsize=7,
+                                           voronoi_label_color='gray')
+
+    return fig
+
 
 
 def _get_country_shape(country):
