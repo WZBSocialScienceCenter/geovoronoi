@@ -3,6 +3,8 @@ Example script that scatters random points across a country and generates the Vo
 the area (km²) for those regions will be calculated. Both the regions and their area will be plotted using the
 `plotting` sub-module of `geovoronoi`.
 
+Note that it is important to use an *equal area* projection before calculating the areas of the Voronoi regions!
+
 Author: Markus Konrad <markus.konrad@wzb.eu>
 March 2018
 """
@@ -34,7 +36,7 @@ assert len(area) == 1
 
 print('CRS:', area.crs)   # gives epsg:4326 -> WGS 84
 
-area = area.to_crs(epsg=3395)    # convert to World Mercator CRS
+area = area.to_crs(epsg=3035)    # convert to Albers Equal Area CRS (ETRS89-extended / LAEA Europe)
 area_shape = area.iloc[0].geometry   # get the Polygon
 
 # generate some random points within the bounds
@@ -60,6 +62,12 @@ poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, a
 
 # calculate area in km², too
 poly_areas = calculate_polygon_areas(poly_shapes, m2_to_km2=True)   # converts m² to km²
+
+print('areas in km²:')
+print(poly_areas)
+
+print('sum:')
+print(sum(poly_areas))
 
 #
 # plotting
