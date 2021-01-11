@@ -196,10 +196,11 @@ def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None, shapes_from_di
         # fix rare cases where the generated polygons of the Voronoi regions don't fully cover `geo_shape`
         vor_polys_union = cascaded_union(poly_shapes)   # union of Voronoi regions
         diff = np.array(geo_shape.difference(vor_polys_union), dtype=object)    # "gaps"
-        diff_areas = np.array([p.area for p in diff])    # areas of "gaps"
-        # use only those "gaps" bigger than `shapes_from_diff_with_min_area` because very tiny areas are generated
-        # at the borders due to floating point errors
-        poly_shapes.extend(diff[diff_areas >= shapes_from_diff_with_min_area])
+        if diff.shape and len(diff) > 0:
+            diff_areas = np.array([p.area for p in diff])    # areas of "gaps"
+            # use only those "gaps" bigger than `shapes_from_diff_with_min_area` because very tiny areas are generated
+            # at the borders due to floating point errors
+            poly_shapes.extend(diff[diff_areas >= shapes_from_diff_with_min_area])
 
     return poly_shapes
 
