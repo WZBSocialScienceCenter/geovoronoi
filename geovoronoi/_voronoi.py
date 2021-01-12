@@ -13,6 +13,7 @@ import numpy as np
 from scipy.spatial import Voronoi
 from scipy.spatial.distance import cdist
 from shapely.geometry import LineString, asPoint, MultiPoint, Polygon
+from shapely.errors import TopologicalError
 from shapely.ops import polygonize, cascaded_union
 
 from ._geom import polygon_around_center
@@ -195,7 +196,11 @@ def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None, shapes_from_di
     if geo_shape is not None and shapes_from_diff_with_min_area is not None:
         # fix rare cases where the generated polygons of the Voronoi regions don't fully cover `geo_shape`
         vor_polys_union = cascaded_union(poly_shapes)   # union of Voronoi regions
-        diff = np.array(geo_shape.difference(vor_polys_union), dtype=object)    # "gaps"
+        try:
+            diff = np.array(geo_shape.difference(vor_polys_union), dtype=object)    # "gaps"
+        except TopologicalError:
+            diff = np.array([], dtype=object)
+
         if diff.shape and len(diff) > 0:
             diff_areas = np.array([p.area for p in diff])    # areas of "gaps"
             # use only those "gaps" bigger than `shapes_from_diff_with_min_area` because very tiny areas are generated
