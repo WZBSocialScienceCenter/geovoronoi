@@ -7,7 +7,6 @@ Author: Markus Konrad <markus.konrad@wzb.eu>
 """
 
 import logging
-from collections import defaultdict
 
 import numpy as np
 from scipy.spatial import Voronoi
@@ -75,10 +74,12 @@ def voronoi_regions_from_coords(coords, geo_shape,
 
     logger.info('assigning %d points to %d Voronoi polygons' % (len(coords), len(poly_shapes)))
     points = coords_to_points(coords)
-    poly_to_pt_assignments, unassigned_pts = assign_points_to_voronoi_polygons(points, poly_shapes,
-                                                                               accept_n_coord_duplicates=accept_n_coord_duplicates,
-                                                                               return_unassigned_points=True,
-                                                                               coords=coords)
+    poly_to_pt_assignments, unassigned_pts = assign_points_to_voronoi_polygons(
+        points, poly_shapes, vor,
+        accept_n_coord_duplicates=accept_n_coord_duplicates,
+        return_unassigned_points=True,
+        coords=coords
+    )
 
     if return_unassigned_points:
         return poly_shapes, points, poly_to_pt_assignments, list(unassigned_pts)
@@ -210,20 +211,24 @@ def polygon_shapes_from_voronoi_lines(poly_lines, geo_shape=None, shapes_from_di
     return poly_shapes
 
 
-def assign_points_to_voronoi_polygons(points, poly_shapes,
+def assign_points_to_voronoi_polygons(points, poly_shapes, vor=None,
                                       accept_n_coord_duplicates=None,
                                       return_unassigned_points=False,
                                       coords=None):
     """
     Assign a list/array of shapely Point objects `points` to their respective Voronoi polygons passed as list
-    `poly_shapes`. Return a list of `assignments` of size `len(poly_shapes)` where ith element in `assignments`
+    `poly_shapes`. Use already generated assignments from SciPy Voronoi in `vor` (SciPy Voronoi object).
+
+    Return a list of `assignments` of size `len(poly_shapes)` where ith element in `assignments`
     contains the index of the point in `points` that resides in the ith Voronoi region.
+
     Normally, 1-to-1 assignments are expected, i.e. for each Voronoi region in `poly_shapes` there's exactly one point
     in `points` belonging to this Voronoi region. However, if there are duplicate coordinates in `points`, then those
     duplicates will be assigned together to their Voronoi region and hence there is a 1-to-n relationship between
-    Voronoi regions and points. If `accept_n_coord_duplicates` is set to None, then an an unspecified number of
+    Voronoi regions and points. If `accept_n_coord_duplicates` is set to None, then an unspecified number of
     duplicates are allowed. If `accept_n_coord_duplicates` is 0, then no point duplicates are allowed, otherwise
-    exactly `accept_n_coord_duplicates` duplicates are allowed.
+    up to `accept_n_coord_duplicates` duplicates are allowed.
+
     Set `return_unassigned_points` to additionally return a list of points that could not be assigned to any Voronoi
     region. `coords` can be passed in order to avoid another conversion from Point objects to NumPy coordinate array.
     """
@@ -253,40 +258,71 @@ def assign_points_to_voronoi_polygons(points, poly_shapes,
         raise ValueError('Unexpected number of geo-coordinates: %d (got %d polygons and expected %d geo-coordinates)' %
                          (n_points, n_polys, expected_n_geocoords))
 
-    # get the Voronoi regions' centroids and calculate the distance between all centroid – input coordinate pairs
-    poly_centroids = np.array([p.centroid.coords[0] for p in poly_shapes])
-    poly_pt_dists = cdist(poly_centroids, coords)
-
     # generate the assignments
-    assignments = []
-    already_assigned = set()
-    n_assigned_dupl = 0
-    for i_poly, vor_poly in enumerate(poly_shapes):
-        # indices to points sorted by distance to this Voronoi region's centroid
-        closest_pt_indices = np.argsort(poly_pt_dists[i_poly])
-        assigned_pts = []
-        n_assigned = len(assigned_pts)
-        for i_pt in closest_pt_indices:      # check each point with increasing distance
-            pt = points[i_pt]
+    assignments = [[] for _ in range(n_polys)]    # region polygon -> point indices
+    already_assigned = set()                      # already assigned point indices
+    n_assigned_dupl = 0                           # number of duplicate points assigned to same region
 
-            if pt.intersects(vor_poly):      # if this point is inside this Voronoi region, assign it to the region
-                if i_pt in already_assigned:
-                    raise RuntimeError('Point %d cannot be assigned to more than one voronoi region' % i_pt)
-                assigned_pts.append(i_pt)
-                already_assigned.add(i_pt)
-                if n_assigned >= accept_n_coord_duplicates - n_assigned_dupl:
-                    break
+    # handle already assigned points passed from generated Voronoi object
+    if vor is not None:
+        finite_regions = np.where([r and all([i >= 0 for i in r]) for r in vor.regions])[0]   # indices
+        logger.info('using already calculated assignments to %d finite Voronoi regions' % len(finite_regions))
 
-        if not assigned_pts:
-            raise RuntimeError('Polygon %d does not contain any point' % i_poly)
+        # find all points assigned to finite regions
+        for i_poly in finite_regions:
+            assigned_pts = np.where(vor.point_region == i_poly)[0].tolist()
 
-        if accept_n_coord_duplicates == 0 and len(assigned_pts) > 1:
-            raise RuntimeError('No duplicate points allowed but polygon %d contains several points: %s'
-                               % (i_poly, str(assigned_pts)))
+            if not assigned_pts:
+                continue
 
-        # add the assignments for this Voronoi region
-        assignments.append(assigned_pts)
-        n_assigned_dupl += len(assigned_pts)-1
+            if accept_n_coord_duplicates == 0 and len(assigned_pts) > 1:
+                raise RuntimeError('No duplicate points allowed but polygon %d contains several points: %s'
+                                   % (i_poly, str(assigned_pts)))
+
+            assignments[i_poly].extend(assigned_pts)
+            already_assigned.update(assigned_pts)
+            n_assigned_dupl += len(assigned_pts) - 1
+
+        unassigned_indices = np.array(list(set(range(n_points)) - already_assigned), dtype=np.int)
+        coords = coords[unassigned_indices]
+        points = [p for i, p in enumerate(points) if i in unassigned_indices]
+    else:
+        unassigned_indices = np.arange(n_points)
+
+    assert len(coords) == len(points) == len(unassigned_indices)
+
+    if len(unassigned_indices) > 0:
+        logger.info('assigning remaining %d points via intersection tests' % len(unassigned_indices))
+        # for the remaining points:
+        # get the Voronoi regions' centroids and calculate the distance between all centroid – input coordinate pairs
+        poly_centroids = np.array([p.centroid.coords[0] for p in poly_shapes])
+        poly_pt_dists = cdist(poly_centroids, coords)
+
+        for i_poly, vor_poly in enumerate(poly_shapes):
+            # indices to points sorted by distance to this Voronoi region's centroid
+            closest_pt_indices = np.argsort(poly_pt_dists[i_poly])
+            assigned_pts = []
+            for i_pt in closest_pt_indices:      # check each point with increasing distance
+                pt = points[i_pt]
+
+                if pt.intersects(vor_poly):      # if this point is inside this Voronoi region, assign it to the region
+                    i_pt_orig = unassigned_indices[i_pt]
+                    if i_pt_orig in already_assigned:
+                        raise RuntimeError('Point %d cannot be assigned to more than one voronoi region' % i_pt_orig)
+                    assigned_pts.append(i_pt_orig)
+                    already_assigned.add(i_pt_orig)
+                    if len(assigned_pts) >= accept_n_coord_duplicates - n_assigned_dupl:
+                        break
+
+            if assigned_pts:
+                # add the assignments for this Voronoi region
+                assignments[i_poly].extend(assigned_pts)
+
+                if accept_n_coord_duplicates == 0 and len(assignments[i_poly]) > 1:
+                    raise RuntimeError('No duplicate points allowed but polygon %d contains several points: %s'
+                                       % (i_poly, str(assignments[i_poly])))
+
+                n_assigned_dupl += len(assigned_pts)-1
 
     # make some final checks
 

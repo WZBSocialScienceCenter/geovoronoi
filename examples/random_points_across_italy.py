@@ -58,13 +58,17 @@ del pts
 
 poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
 
+print(poly_to_pt_assignments)
+
 #
 # plotting
 #
 
 fig, ax = subplot_for_map()
 
-plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords, poly_to_pt_assignments)
+plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords, poly_to_pt_assignments,
+                                       point_labels=list(map(str, range(len(coords)))),
+                                       voronoi_labels=list(map(str, range(len(poly_shapes)))))
 #plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords)   # monocolor
 
 ax.set_title('%d random points and their Voronoi regions in %s' % (len(pts), COUNTRY))
