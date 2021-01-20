@@ -135,11 +135,14 @@ def plot_lines(ax, points, linewidth=1, color=None, **kwargs):
     ax.plot(x, y, linewidth=linewidth, color=color, **kwargs)
 
 
-def plot_polygon(ax, polygon, facecolor=None, edgecolor=None, linewidth=1, linestyle='solid', **kwargs):
+def plot_polygon(ax, polygon, facecolor=None, edgecolor=None, linewidth=1, linestyle='solid',
+                 label=None, label_fontsize=7, label_color='k', **kwargs):
     ax.add_collection(PatchCollection([PolygonPatch(polygon)],
                                       facecolor=facecolor, edgecolor=edgecolor,
                                       linewidth=linewidth, linestyle=linestyle,
                                       **kwargs))
+    if label:
+        ax.text(polygon.centroid.x, polygon.centroid.y, label, fontsize=label_fontsize, color=label_color)
 
 
 def plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, points, poly_to_pt_assignments=None,
