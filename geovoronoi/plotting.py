@@ -9,6 +9,8 @@ Author: Markus Konrad <markus.konrad@wzb.eu>
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.collections import PatchCollection
+from descartes.patch import PolygonPatch
 from geopandas.plotting import _flatten_multi_geoms
 from geopandas import GeoSeries
 
@@ -56,6 +58,17 @@ def colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments, cma
     return vor_colors, pt_colors
 
 
+def xy_from_points(points):
+    if hasattr(points, 'xy'):
+        return points.xy
+    else:
+        if not isinstance(points, np.ndarray):
+            coords = points_to_coords(points)
+        else:
+            coords = points
+        return coords[:, 0], coords[:, 1]
+
+
 def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None, label_fontsize=10, label_color=None,
                        **kwargs):
     """
@@ -80,7 +93,7 @@ def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None,
             ax.text(tx, ty, lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
 
 
-def plot_points(ax, points, markersize, marker='o', color=None, labels=None, label_fontsize=7, label_color=None,
+def plot_points(ax, points, markersize=1, marker='o', color=None, labels=None, label_fontsize=7, label_color=None,
                 label_draw_duplicates=False, **kwargs):
     """
     Plot points `points` (either list of Point objects or NumPy coordinate array) on matplotlib Axes object `ax` with
@@ -89,27 +102,44 @@ def plot_points(ax, points, markersize, marker='o', color=None, labels=None, lab
     `label_color`. All color parameters can also be a sequence.
     Additional parameters can be passed to matplotlib's `scatter` function as `kwargs`.
     """
-    if not isinstance(points, np.ndarray):
-        coords = points_to_coords(points)
-    else:
-        coords = points
+    x, y = xy_from_points(points)
 
-    ax.scatter(coords[:, 0], coords[:, 1], s=markersize, marker=marker, color=color, **kwargs)
+    ax.scatter(x, y, s=markersize, marker=marker, color=color, **kwargs)
 
     if labels:
         # plot labels using matplotlib's text()
         n_labels = len(labels)
-        n_features = len(coords)
+        n_features = len(x)
         if n_labels != n_features:
             raise ValueError('number of labels (%d) must match number of points (%d)'
                              % (n_labels, n_features))
 
         drawn_coords = set()
-        for i, (pos, lbl) in enumerate(zip(coords, labels)):
-            pos = tuple(pos)  # make hashable
+        for i, (x_i, y_i, lbl) in enumerate(zip(x, y, labels)):
+            pos = (x_i, y_i)  # make hashable
             if label_draw_duplicates or pos not in drawn_coords:
-                ax.text(pos[0], pos[1], lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
+                ax.text(x_i, y_i, lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
                 drawn_coords.add(pos)
+
+
+def plot_lines(ax, points, linewidth=1, color=None, **kwargs):
+    """
+    Plot points `points` (either list of Point objects or NumPy coordinate array) on matplotlib Axes object `ax` with
+    marker size `markersize`. Define marker style with parameters `marker` and `color`. Optionally supply a list of
+    labels `labels` that will be displayed next to the respective point using the styling options `label_fontsize` and
+    `label_color`. All color parameters can also be a sequence.
+    Additional parameters can be passed to matplotlib's `scatter` function as `kwargs`.
+    """
+    x, y = xy_from_points(points)
+
+    ax.plot(x, y, linewidth=linewidth, color=color, **kwargs)
+
+
+def plot_polygon(ax, polygon, facecolor=None, edgecolor=None, linewidth=1, linestyle='solid', **kwargs):
+    ax.add_collection(PatchCollection([PolygonPatch(polygon)],
+                                      facecolor=facecolor, edgecolor=edgecolor,
+                                      linewidth=linewidth, linestyle=linestyle,
+                                      **kwargs))
 
 
 def plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, points, poly_to_pt_assignments=None,
@@ -196,9 +226,6 @@ def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
 
     collection : matplotlib.collections.Collection that was plotted
     """
-    from descartes.patch import PolygonPatch
-    from matplotlib.collections import PatchCollection
-
     if not isinstance(geoms, GeoSeries):
         geoms = GeoSeries(geoms)
 

@@ -2,37 +2,37 @@ from collections import defaultdict
 from matplotlib import pyplot as plt
 
 from scipy.spatial import Voronoi, voronoi_plot_2d
-from shapely.geometry import LineString, asPoint, MultiPoint, Polygon
+from shapely.geometry import LineString, LinearRing, asPoint, MultiPoint, Polygon
 from shapely.ops import polygonize
 
 import numpy as np
 
-from examples.figures import SIZE, set_limits, plot_coords, plot_bounds, plot_line
 from geovoronoi._geom import polygon_around_center
+from geovoronoi.plotting import subplot_for_map, plot_points, plot_lines, plot_polygon
 
 #%%
 
 geo_shape = Polygon([[-1, -1], [3, -1], [3, 3], [-1, 3], [-1, -1]])
 
-fig, ax = plt.subplots()
-ax.set_aspect('equal')
+points = np.array([[0, 0], [1, 0], [2, 0],
+                   [0, 1], [1, 1], [2, 1],
+                   [0, 2], [1, 2], [2, 2]])
 
-plot_coords(ax, geo_shape.exterior)
-plot_line(ax, geo_shape.exterior)
+fig, ax = subplot_for_map(show_x_axis=True, show_y_axis=True)
 
-points = np.array([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2],
-                   [2, 0], [2, 1], [2, 2]])
-
-plot_coords(ax, LineString(points), color='r')
+plot_polygon(ax, geo_shape, facecolor=(0, 0, 0, 0.0), edgecolor='r')
+plot_points(ax, points, color='r', markersize=1, labels=list(map(str, range(len(points)))), label_color='r')
 
 fig.show()
+
 
 #%%
 
 vor = Voronoi(points)
 
-fig = voronoi_plot_2d(vor)
-plt.show()
+vorfig = voronoi_plot_2d(vor)
+vorfig.show()
+del vorfig
 
 vor.vertices
 vor.regions
@@ -45,7 +45,40 @@ ridge_vert = np.array(vor.ridge_vertices)
 
 #%%
 
-farpoints_max_extend_factor = 10
+farpoints_max_extend_factor = 1
+max_dim_extend = vor.points.ptp(axis=0).max() * farpoints_max_extend_factor
+center = np.array(MultiPoint(vor.points).convex_hull.centroid)
+
+region_pts = defaultdict(list)
+region_lines = defaultdict(list)
+
+for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
+    simplex = np.asarray(simplex)
+    print(f'points: {pointidx[0]} <-> {pointidx[1]}, simplex indices: {simplex}')
+    if np.all(simplex >= 0):  # full finite polygon line
+        print('> finite')
+        #poly_lines.append(LineString(vor.vertices[simplex]))
+    else:  # "loose ridge": contains infinite Voronoi vertex
+        print('> loose')
+        i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
+        t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
+        t /= np.linalg.norm(t)
+        n = np.array([-t[1], t[0]])  # normal
+
+        midpoint = vor.points[pointidx].mean(axis=0)
+        direction = np.sign(np.dot(midpoint - center, n)) * n
+        direction = direction / np.linalg.norm(direction)  # to unit vector
+
+        far_point = vor.vertices[i] + direction * max_dim_extend * farpoints_max_extend_factor
+        print(f'> finite vertex {i}: {vor.vertices[i]}')
+        print(f'> far point: {far_point}')
+        # loose_ridges.append(LineString(np.vstack((vor.vertices[i], far_point))))
+        # far_points.append(far_point)
+
+
+#%%
+
+farpoints_max_extend_factor = 1
 max_dim_extend = vor.points.ptp(axis=0).max() * farpoints_max_extend_factor
 center = np.array(MultiPoint(vor.points).convex_hull.centroid)
 
@@ -54,26 +87,37 @@ region_polys = {}
 for i_reg, reg_vert in enumerate(vor.regions):
     pt_indices = np.where(vor.point_region == i_reg)[0]
     if len(pt_indices) == 0:   # skip regions w/o points in them
+        print(i_reg, 'empty')
         continue
 
-    region_pts[i_reg].extend(pt_indices)
-    if np.all(np.array(reg_vert) >= 0):  # fully finite-bounded region
-        print('finite')
-        print(vor.vertices[reg_vert])
-        p = Polygon(vor.vertices[reg_vert])
-        region_polys[i_reg] = p
-    else:
-        print('not finite')
-        print(reg_vert)
+    print(i_reg)
+    print('> vertice indices: ', reg_vert)
+    print('> point indices: ', pt_indices)
 
-        for i_pt in pt_indices:
-            enclosing_ridge_pts_mask = (vor.ridge_points[:, 0] == i_pt) | (vor.ridge_points[:, 1] == i_pt)
-            for pointidx, simplex in zip(vor.ridge_points[enclosing_ridge_pts_mask],
-                                         ridge_vert[enclosing_ridge_pts_mask]):
-                assert np.any(simplex < 0)
-                assert np.any(simplex >= 0)
+    region_pts[i_reg].extend(pt_indices)
+
+    if np.all(np.array(reg_vert) >= 0):  # fully finite-bounded region
+        print('> finite')
+        p = Polygon(vor.vertices[reg_vert])
+    else:
+        print('> not finite')
+
+        p_vertices = []
+        #prev_far_point = None
+        i_pt = pt_indices[0]     # only consider one point, not a duplicate
+        print('>> point', i_pt)
+        enclosing_ridge_pts_mask = (vor.ridge_points[:, 0] == i_pt) | (vor.ridge_points[:, 1] == i_pt)
+        for pointidx, simplex in zip(vor.ridge_points[enclosing_ridge_pts_mask],
+                                     ridge_vert[enclosing_ridge_pts_mask]):
+            print('>> pointidx', pointidx)
+            print('>> simplex indices', simplex)
+
+            if np.all(simplex >= 0):
+                p_vertices.extend(map(tuple, vor.vertices[simplex]))
+            else:
                 # "loose ridge": contains infinite Voronoi vertex
                 i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
+                finite_pt = vor.vertices[i]
 
                 t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
                 t /= np.linalg.norm(t)
@@ -83,8 +127,55 @@ for i_reg, reg_vert in enumerate(vor.regions):
                 direction = np.sign(np.dot(midpoint - center, n)) * n
                 direction = direction / np.linalg.norm(direction)  # to unit vector
 
-                far_point = vor.vertices[i] + direction * max_dim_extend * farpoints_max_extend_factor
+                far_point_tuple = tuple(finite_pt + direction * max_dim_extend * farpoints_max_extend_factor)
+                finite_pt_tuple = tuple(finite_pt)
 
+                new_line = [finite_pt_tuple, far_point_tuple]
+
+                print(f'>> finite point {i} is {finite_pt_tuple}')
+                print(f'>> far point is {far_point_tuple}')
+
+                # if p_vertices:
+                #     for v_i in range(0, len(p_vertices), 2):
+                #         p_vertices[v_i:(v_i+2)]
+                #     p_vertices.index(new_line[0])
+
+                if p_vertices:
+                    last2, last1 = p_vertices[-2:]
+                    if last1 in new_line and last1 == new_line[1]:
+                        new_line = reversed(new_line)
+                    elif last2 in new_line:
+                        p_vertices = p_vertices[:-2] + p_vertices[-2:][::-1]
+                        if last2 == new_line[1]:
+                            new_line = reversed(new_line)
+
+                p_vertices.extend(new_line)
+
+        print(f'> polygon vertices: {p_vertices}')
+        p = Polygon(LinearRing(np.array(p_vertices)))
+        # polys = list(polygonize(LinearRing(np.array(p_vertices))))
+        # assert len(polys) == 1
+        # p = polys[0]
+        #p = Polygon(np.array(p_vertices))
+
+    assert p.is_valid and p.is_simple
+    region_polys[i_reg] = p
+
+
+#%%
+
+list(region_polys[1].exterior.coords)
+
+#%%
+
+fig, ax = subplot_for_map(show_x_axis=True, show_y_axis=True)
+
+plot_polygon(ax, geo_shape, facecolor=(0, 0, 0, 0.0), edgecolor='r')
+plot_points(ax, points, color='r', markersize=1, labels=list(map(str, range(len(points)))), label_color='r')
+
+plot_polygon(ax, region_polys[1], edgecolor='k', facecolor=(0, 0, 0, 0.1), linestyle='dashed')
+plot_polygon(ax, region_polys[2], edgecolor='k', facecolor=(0, 0, 0, 0.1), linestyle='dashed')
+fig.show()
 
 #%%
 
@@ -98,13 +189,13 @@ loose_ridges = []
 far_points = []
 for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
     simplex = np.asarray(simplex)
+    print(f'pointidx: {pointidx}, simplex: {simplex}')
     if np.all(simplex >= 0):  # full finite polygon line
-        print('full finite:')
-        print(pointidx)
+        print('> finite')
         poly_lines.append(LineString(vor.vertices[simplex]))
     else:  # "loose ridge": contains infinite Voronoi vertex
+        print('> loose')
         i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
-
         t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
         t /= np.linalg.norm(t)
         n = np.array([-t[1], t[0]])  # normal
@@ -114,7 +205,8 @@ for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
         direction = direction / np.linalg.norm(direction)  # to unit vector
 
         far_point = vor.vertices[i] + direction * max_dim_extend * farpoints_max_extend_factor
-
+        print(f'> finite vertex {i}: {vor.vertices[i]}')
+        print(f'> far point: {far_point}')
         loose_ridges.append(LineString(np.vstack((vor.vertices[i], far_point))))
         far_points.append(far_point)
 
@@ -165,3 +257,7 @@ len(poly_shapes)
 
 #%%
 
+for p in poly_shapes:
+    plot_polygon(ax, p, edgecolor='k', facecolor=(0, 0, 0, 0.1), linestyle='dashed')
+
+fig.show()
