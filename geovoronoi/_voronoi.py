@@ -12,7 +12,7 @@ from collections import defaultdict
 import numpy as np
 from scipy.spatial import Voronoi
 from scipy.spatial.distance import cdist
-from shapely.geometry import LineString, asPoint, MultiPoint, Polygon
+from shapely.geometry import LineString, asPoint, MultiPoint, Polygon, MultiPolygon
 from shapely.errors import TopologicalError
 from shapely.ops import polygonize, cascaded_union
 
@@ -73,6 +73,13 @@ def voronoi_regions_from_coords(coords, geo_shape, farpoints_max_extend_factor=1
 
 
 def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False, farpoints_max_extend_factor=10):
+    if isinstance(geo_shape, Polygon):
+        geoms = geo_shape
+    elif isinstance(geo_shape, MultiPolygon):
+        geoms = geo_shape.geoms
+    else:
+        raise ValueError('`geo_shape` must be a Polygon or MultiPolygon')
+
     max_dim_extend = vor.points.ptp(axis=0).max() * farpoints_max_extend_factor
     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
     ridge_vert = np.array(vor.ridge_vertices)
@@ -85,6 +92,15 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False,
             continue
 
         region_pts[i_reg].extend(pt_indices.tolist())
+
+        geom = {g for pt in vor.points[pt_indices] for g in geoms if g.contains(pt)}
+        if len(geom) == 0:
+            raise RuntimeError('no sub-geometry of `geo_shape` contains a point of %s' % str(vor.points[pt_indices]))
+        elif len(geom) > 1:
+            raise RuntimeError('more than one sub-geometry of `geo_shape` contains a point of %s'
+                               % str(vor.points[pt_indices]))
+        else:
+            geom = geom.pop()
 
         if np.all(np.array(reg_vert) >= 0):  # fully finite-bounded region
             p = Polygon(vor.vertices[reg_vert])

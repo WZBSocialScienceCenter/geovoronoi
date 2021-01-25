@@ -8,6 +8,7 @@ March 2018
 
 
 import logging
+from pprint import pprint
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -61,7 +62,7 @@ print('will use %d of %d randomly generated points that are inside geographic ar
 poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(pts, area_shape)
 
 print('Voronoi region to point assignments:')
-print(poly_to_pt_assignments)
+pprint(poly_to_pt_assignments)
 
 #%%
 
