@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import geopandas as gpd
 
-from geovoronoi import coords_to_points, points_to_coords, voronoi_regions_from_coords
+from geovoronoi import coords_to_points, voronoi_regions_from_coords
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
 
@@ -21,6 +21,8 @@ logging.basicConfig(level=logging.INFO)
 geovoronoi_log = logging.getLogger('geovoronoi')
 geovoronoi_log.setLevel(logging.INFO)
 geovoronoi_log.propagate = True
+
+#%%
 
 N_POINTS = 100
 COUNTRY = 'Italy'
@@ -46,19 +48,22 @@ coords = np.vstack((randx, randy)).T
 
 # use only the points inside the geographic area
 pts = [p for p in coords_to_points(coords) if p.within(area_shape)]  # converts to shapely Point
+del coords   # not used any more
 
 print('will use %d of %d randomly generated points that are inside geographic area' % (len(pts), N_POINTS))
-coords = points_to_coords(pts)   # convert back to simple NumPy coordinate array
 
-del pts
+#%%
 
 #
 # calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
 #
 
-poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
+poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(pts, area_shape)
 
+print('Voronoi region to point assignments:')
 print(poly_to_pt_assignments)
+
+#%%
 
 #
 # plotting
@@ -66,10 +71,9 @@ print(poly_to_pt_assignments)
 
 fig, ax = subplot_for_map()
 
-plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords, poly_to_pt_assignments,
-                                       point_labels=list(map(str, range(len(coords)))),
-                                       voronoi_labels=list(map(str, range(len(poly_shapes)))))
-#plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords)   # monocolor
+plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, pts, poly_to_pt_assignments,
+                                       point_labels=list(map(str, range(len(pts)))),
+                                       voronoi_labels=list(map(str, poly_to_pt_assignments.keys())))
 
 ax.set_title('%d random points and their Voronoi regions in %s' % (len(pts), COUNTRY))
 

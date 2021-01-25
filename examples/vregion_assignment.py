@@ -101,7 +101,7 @@ for i_reg, reg_vert in enumerate(vor.regions):
                 p_vertices.extend([finite_pt, far_point])
 
         print(f'> polygon vertices: {p_vertices}')
-        p = MultiPoint(p_vertices).convex_hull
+        p = MultiPoint(p_vertices).convex_hull    # Voronoi regions are convex
 
     assert p.is_valid and p.is_simple, 'generated polygon is valid and simple'
     region_polys[i_reg] = p

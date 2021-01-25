@@ -49,9 +49,10 @@ def colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments, cma
     Generate colors for the shapes and points in `poly_shapes` and `poly_to_pt_assignments` using matplotlib color
     map `cmap_name`.
     """
-    vor_colors = generate_n_colors(len(poly_shapes), cmap_name=cmap_name)
-
-    pt_colors = [vor_colors[i_vor] for i_vor in get_points_to_poly_assignments(poly_to_pt_assignments)]
+    vor_colors = {p_id: col
+                  for p_id, col in zip(poly_shapes.keys(), generate_n_colors(len(poly_shapes), cmap_name=cmap_name))}
+    pt_to_poly = sorted(get_points_to_poly_assignments(poly_to_pt_assignments).items(), key=lambda x: x[0])
+    pt_colors = [vor_colors[i_vor] for _, i_vor in pt_to_poly]
 
     assert len(vor_colors) <= len(pt_colors)
 
@@ -88,7 +89,7 @@ def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None,
             raise ValueError('number of labels (%d) must match number of Voronoi polygons (%d)'
                              % (n_labels, n_features))
 
-        for i, (p, lbl) in enumerate(zip(poly_shapes, labels)):
+        for (i, p), lbl in zip(poly_shapes.items(), labels):
             tx, ty = p.centroid.coords[0]
             ax.text(tx, ty, lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
 
@@ -229,20 +230,43 @@ def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
 
     collection : matplotlib.collections.Collection that was plotted
     """
+
+    color_values = color
+    color_indices = None
+
     if not isinstance(geoms, GeoSeries):
-        geoms = GeoSeries(geoms)
+        if isinstance(geoms, dict):
+            geoms_indices = np.array(list(geoms.keys()))
+            geoms_values = list(geoms.values())
 
-    geoms, indices = _flatten_multi_geoms(geoms)
+            if isinstance(color, dict):
+                color_indices = np.array(list(color.keys()))
+                color_values = np.array(list(color.values()))
+        else:
+            geoms_indices = np.arange(len(geoms))
+            geoms_values = geoms
+        geoms = GeoSeries(geoms_values)
+    else:
+        geoms_indices = geoms.index.to_numpy()
 
-    if isinstance(color, (list, tuple)):
-        color = np.array(color)[indices]
+    if isinstance(color, list):
+        color_values = np.array(color)
+        color_indices = np.arange(len(color))
+    elif isinstance(color, np.ndarray):
+        color_values = color
+        color_indices = np.arange(len(color))
+
+    geoms, multi_indices = _flatten_multi_geoms(geoms)
+
+    if color_indices is not None:
+        color_values = color_values[np.nonzero(geoms_indices[multi_indices][..., np.newaxis] == color_indices)[1]]
 
     # PatchCollection does not accept some kwargs.
     if 'markersize' in kwargs:
         del kwargs['markersize']
 
     collection = PatchCollection([PolygonPatch(poly) for poly in geoms],
-                                 color=color, **kwargs)
+                                 color=color_values, **kwargs)
 
     ax.add_collection(collection, autolim=True)
     ax.autoscale_view()
