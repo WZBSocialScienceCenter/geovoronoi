@@ -25,7 +25,7 @@ geovoronoi_log.propagate = True
 
 #%%
 
-N_POINTS = 10
+N_POINTS = 5
 COUNTRY = 'Italy'
 
 np.random.seed(123)

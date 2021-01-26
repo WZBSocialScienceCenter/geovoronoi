@@ -62,9 +62,10 @@ def line_segment_intersection(l_off, l_dir, segm_a, segm_b):
     else:
         t = np.matmul(np.linalg.inv(v), p.T)
         # intersection at l_off + t_0 * l_dir and segm_a + t_1 * segm_dir
-        # -> we're only interested if l_dir hits the segment (segm_a,segm_b), hence if t_1 is in [0, 1]
+        # -> we're only interested if l_dir hits the segment (segm_a,segm_b) when it goes in positive direction,
+        #    hence if t_0 is positive and t_1 is in [0, 1]
 
-        if 0 <= t[1] <= 1:
+        if t[0] >= 0 and 0 <= t[1] <= 1:
             return segm_a + t[1] * segm_dir
         else:
             return None

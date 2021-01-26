@@ -111,38 +111,42 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
         else:
             p_vertices = []
             i_pt = pt_indices[0]  # only consider one point, not a duplicate
-            enclosing_ridge_pts_mask = (vor.ridge_points[:, 0] == i_pt) | (vor.ridge_points[:, 1] == i_pt)
-            for pointidx, simplex in zip(vor.ridge_points[enclosing_ridge_pts_mask],
-                                         ridge_vert[enclosing_ridge_pts_mask]):
+            for ridge_pt_side in (0, 1):
+                enclosing_ridge_pts_mask = vor.ridge_points[:, ridge_pt_side] == i_pt
+                for pointidx, simplex in zip(vor.ridge_points[enclosing_ridge_pts_mask],
+                                             ridge_vert[enclosing_ridge_pts_mask]):
 
-                if np.all(simplex >= 0):
-                    p_vertices.extend(vor.vertices[simplex])
-                else:
-                    # "loose ridge": contains infinite Voronoi vertex
-                    # we calculate the far point, i.e. the point of intersection with a surrounding polygon boundary
-                    i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
-                    finite_pt = vor.vertices[i]
+                    if np.all(simplex >= 0):
+                        p_vertices.extend(vor.vertices[simplex])
+                    else:
+                        # "loose ridge": contains infinite Voronoi vertex
+                        # we calculate the far point, i.e. the point of intersection with a surrounding polygon boundary
+                        i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
+                        finite_pt = vor.vertices[i]
 
-                    t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
-                    t /= np.linalg.norm(t)
-                    n = np.array([-t[1], t[0]])  # normal
+                        if ridge_pt_side == 1:
+                            pointidx = pointidx[::-1]
 
-                    midpoint = vor.points[pointidx].mean(axis=0)
-                    direction = np.sign(np.dot(midpoint - center, n)) * n
-                    direction = direction / np.linalg.norm(direction)  # to unit vector
+                        t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
+                        t /= np.linalg.norm(t)
+                        n = np.array([-t[1], t[0]])  # normal
 
-                    isects = []
-                    for i_ext_coord in range(len(geom.exterior.coords) - 1):
-                        isect = line_segment_intersection(midpoint, direction,
-                                                          np.array(geom.exterior.coords[i_ext_coord]),
-                                                          np.array(geom.exterior.coords[i_ext_coord+1]))
-                        if isect is not None:
-                            isects.append(isect)
+                        midpoint = vor.points[pointidx].mean(axis=0)
+                        direction = np.sign(np.dot(midpoint - center, n)) * n
+                        direction = direction / np.linalg.norm(direction)  # to unit vector
 
-                    assert isects, 'far point must intersect with surrounding geometry from `geo_shape`'
+                        isects = []
+                        for i_ext_coord in range(len(geom.exterior.coords) - 1):
+                            isect = line_segment_intersection(midpoint, direction,
+                                                              np.array(geom.exterior.coords[i_ext_coord]),
+                                                              np.array(geom.exterior.coords[i_ext_coord+1]))
+                            if isect is not None:
+                                isects.append(isect)
 
-                    closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
-                    p_vertices.extend([finite_pt, isects[closest_isect_idx]])
+                        assert isects, 'far point must intersect with surrounding geometry from `geo_shape`'
+
+                        closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
+                        p_vertices.extend([finite_pt, isects[closest_isect_idx]])
 
             p = MultiPoint(p_vertices).convex_hull  # Voronoi regions are convex
 
@@ -166,7 +170,10 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
             diff = diff.geoms
         else:
             diff = [diff]
-        add = [diff_part for diff_part in diff if p.intersects(diff_part)]
+
+        add = [diff_part for diff_part in diff
+               if isinstance(p.intersection(diff_part), Polygon) and not p.intersection(diff_part).is_empty]
+        add = list(diff) # TODO
         if add:
             region_polys[i_reg] = cascaded_union([p] + add)
 
