@@ -84,6 +84,7 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
     ridge_vert = np.array(vor.ridge_vertices)
 
     region_pts = defaultdict(list)
+    region_neighbor_pts = defaultdict(set)
     region_polys = {}
     region_surroundings = {}
     surroundings_region = defaultdict(list)
@@ -126,6 +127,8 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
 
                         if ridge_pt_side == 1:
                             pointidx = pointidx[::-1]
+
+                        region_neighbor_pts[i_reg].add(pointidx[1])
 
                         t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
                         t /= np.linalg.norm(t)
@@ -173,7 +176,6 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
 
         add = [diff_part for diff_part in diff
                if isinstance(p.intersection(diff_part), Polygon) and not p.intersection(diff_part).is_empty]
-        add = list(diff) # TODO
         if add:
             region_polys[i_reg] = cascaded_union([p] + add)
 
