@@ -21,7 +21,7 @@ from geovoronoi._geom import calculate_polygon_areas, line_segment_intersection
         # parallel
         ([1, 3], [2, 1], [2, 1.5], [4, 2.5], None),
         ([1, 3], [-2, -1], [2, 1.5], [4, 2.5], None),
-        # edge-cases
+        # some edge-cases
         ([0, 0], [0, 1], [0, 0], [0, 1], [0, 0]),
         ([0, 0], [1, 0], [0, 0], [1, 0], [0, 0]),
     ]

@@ -16,6 +16,8 @@ from shapely.geometry import LineString, asPoint, MultiPoint, Polygon, MultiPoly
 from shapely.errors import TopologicalError
 from shapely.ops import polygonize, cascaded_union
 
+from ._geom import line_segment_intersection
+
 
 logger = logging.getLogger('geovoronoi')
 logger.addHandler(logging.NullHandler())
@@ -31,7 +33,7 @@ def points_to_coords(pts):
     return np.array([p.coords[0] for p in pts])
 
 
-def voronoi_regions_from_coords(coords, geo_shape, farpoints_max_extend_factor=10):
+def voronoi_regions_from_coords(coords, geo_shape):
     """
     Calculate Voronoi regions from NumPy array of 2D coordinates `coord` that lie within a shape `geo_shape`. Setting
     `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully cover `geo_shape`. Set this
@@ -65,27 +67,26 @@ def voronoi_regions_from_coords(coords, geo_shape, farpoints_max_extend_factor=1
     logger.info('generated %d Voronoi regions' % (len(vor.regions)-1))
 
     logger.info('generating Voronoi polygon regions')
-    region_polys, region_pts = region_polygons_from_voronoi(vor, geo_shape,
-                                                            return_point_assignments=True,
-                                                            farpoints_max_extend_factor=farpoints_max_extend_factor)
+    region_polys, region_pts = region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=True)
 
     return region_polys, region_pts
 
 
-def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False, farpoints_max_extend_factor=10):
+def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False):
     if isinstance(geo_shape, Polygon):
-        geoms = geo_shape
+        geoms = [geo_shape]
     elif isinstance(geo_shape, MultiPolygon):
         geoms = geo_shape.geoms
     else:
         raise ValueError('`geo_shape` must be a Polygon or MultiPolygon')
 
-    max_dim_extend = vor.points.ptp(axis=0).max() * farpoints_max_extend_factor
     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
     ridge_vert = np.array(vor.ridge_vertices)
 
     region_pts = defaultdict(list)
     region_polys = {}
+    region_surroundings = {}
+    surroundings_region = defaultdict(list)
     for i_reg, reg_vert in enumerate(vor.regions):
         pt_indices = np.where(vor.point_region == i_reg)[0]
         if len(pt_indices) == 0:  # skip regions w/o points in them
@@ -93,14 +94,17 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False,
 
         region_pts[i_reg].extend(pt_indices.tolist())
 
-        geom = {g for pt in vor.points[pt_indices] for g in geoms if g.contains(pt)}
-        if len(geom) == 0:
+        geom_indices = {i_g for pt in vor.points[pt_indices] for i_g, g in enumerate(geoms) if g.contains(asPoint(pt))}
+        if len(geom_indices) == 0:
             raise RuntimeError('no sub-geometry of `geo_shape` contains a point of %s' % str(vor.points[pt_indices]))
-        elif len(geom) > 1:
+        elif len(geom_indices) > 1:
             raise RuntimeError('more than one sub-geometry of `geo_shape` contains a point of %s'
                                % str(vor.points[pt_indices]))
-        else:
-            geom = geom.pop()
+
+        geom_idx = geom_indices.pop()
+        geom = geoms[geom_idx]
+        surroundings_region[geom_idx].append(i_reg)
+        region_surroundings[i_reg] = geom_idx
 
         if np.all(np.array(reg_vert) >= 0):  # fully finite-bounded region
             p = Polygon(vor.vertices[reg_vert])
@@ -115,6 +119,7 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False,
                     p_vertices.extend(vor.vertices[simplex])
                 else:
                     # "loose ridge": contains infinite Voronoi vertex
+                    # we calculate the far point, i.e. the point of intersection with a surrounding polygon boundary
                     i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
                     finite_pt = vor.vertices[i]
 
@@ -126,20 +131,44 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False,
                     direction = np.sign(np.dot(midpoint - center, n)) * n
                     direction = direction / np.linalg.norm(direction)  # to unit vector
 
-                    far_point = finite_pt + direction * max_dim_extend * farpoints_max_extend_factor
+                    isects = []
+                    for i_ext_coord in range(len(geom.exterior.coords) - 1):
+                        isect = line_segment_intersection(midpoint, direction,
+                                                          np.array(geom.exterior.coords[i_ext_coord]),
+                                                          np.array(geom.exterior.coords[i_ext_coord+1]))
+                        if isect is not None:
+                            isects.append(isect)
 
-                    p_vertices.extend([finite_pt, far_point])
+                    assert isects, 'far point must intersect with surrounding geometry from `geo_shape`'
+
+                    closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
+                    p_vertices.extend([finite_pt, isects[closest_isect_idx]])
 
             p = MultiPoint(p_vertices).convex_hull  # Voronoi regions are convex
 
-        assert p.is_valid and p.is_simple, 'generated polygon is valid and simple'
+        assert p.is_valid and p.is_simple and not p.is_empty, 'generated polygon is not valid, not simple or empty'
 
-        if not geo_shape.contains(p):
-            p = p.intersection(geo_shape)
-            assert p.is_valid and p.is_simple, 'generated polygon is valid and simple after ' \
-                                               'intersection with `geo_shape`'
+        if not geom.contains(p):
+            p = p.intersection(geom)
+            assert p.is_valid and p.is_simple and not p.is_empty, 'generated polygon is not valid or not simple or ' \
+                                                                  'empty after  intersection with the surrounding ' \
+                                                                  'geometry from `geo_shape`'
 
         region_polys[i_reg] = p
+
+    for i_reg, p in region_polys.items():
+        surround_geom_idx = region_surroundings[i_reg]
+        union_other_regions = cascaded_union([region_polys[i_other]
+                                              for i_other in surroundings_region[surround_geom_idx]
+                                              if i_reg != i_other])
+        diff = geoms[surround_geom_idx].difference(union_other_regions)
+        if isinstance(diff, MultiPolygon):
+            diff = diff.geoms
+        else:
+            diff = [diff]
+        add = [diff_part for diff_part in diff if p.intersects(diff_part)]
+        if add:
+            region_polys[i_reg] = cascaded_union([p] + add)
 
     if return_point_assignments:
         return region_polys, region_pts
