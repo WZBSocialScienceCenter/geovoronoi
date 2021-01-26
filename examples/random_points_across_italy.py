@@ -13,6 +13,7 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 import numpy as np
 import geopandas as gpd
+from shapely.geometry import Polygon, box
 
 from geovoronoi import coords_to_points, voronoi_regions_from_coords
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
@@ -73,8 +74,8 @@ pprint(poly_to_pt_assignments)
 fig, ax = subplot_for_map()
 
 plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, pts, poly_to_pt_assignments,
-                                       point_labels=list(map(str, range(len(pts)))),
-                                       voronoi_labels=list(map(str, poly_to_pt_assignments.keys())))
+                                       point_labels=list(map(str, range(len(pts)))))
+                                       #voronoi_labels=list(map(str, poly_to_pt_assignments.keys())))
 
 ax.set_title('%d random points and their Voronoi regions in %s' % (len(pts), COUNTRY))
 

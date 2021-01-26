@@ -12,7 +12,7 @@ from collections import defaultdict
 import numpy as np
 from scipy.spatial import Voronoi
 from scipy.spatial.distance import cdist
-from shapely.geometry import LineString, asPoint, MultiPoint, Polygon, MultiPolygon
+from shapely.geometry import box, LineString, asPoint, MultiPoint, Polygon, MultiPolygon
 from shapely.errors import TopologicalError
 from shapely.ops import polygonize, cascaded_union
 
@@ -104,6 +104,7 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
 
         geom_idx = geom_indices.pop()
         geom = geoms[geom_idx]
+        geom_bb = box(*geom.bounds)
         surroundings_region[geom_idx].append(i_reg)
         region_surroundings[i_reg] = geom_idx
 
@@ -117,6 +118,8 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
                 for pointidx, simplex in zip(vor.ridge_points[enclosing_ridge_pts_mask],
                                              ridge_vert[enclosing_ridge_pts_mask]):
 
+                    region_neighbor_pts[i_reg].update([x for x in pointidx if x != i_pt])
+
                     if np.all(simplex >= 0):
                         p_vertices.extend(vor.vertices[simplex])
                     else:
@@ -128,8 +131,6 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
                         if ridge_pt_side == 1:
                             pointidx = pointidx[::-1]
 
-                        region_neighbor_pts[i_reg].add(pointidx[1])
-
                         t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
                         t /= np.linalg.norm(t)
                         n = np.array([-t[1], t[0]])  # normal
@@ -139,10 +140,10 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
                         direction = direction / np.linalg.norm(direction)  # to unit vector
 
                         isects = []
-                        for i_ext_coord in range(len(geom.exterior.coords) - 1):
+                        for i_ext_coord in range(len(geom_bb.exterior.coords) - 1):
                             isect = line_segment_intersection(midpoint, direction,
-                                                              np.array(geom.exterior.coords[i_ext_coord]),
-                                                              np.array(geom.exterior.coords[i_ext_coord+1]))
+                                                              np.array(geom_bb.exterior.coords[i_ext_coord]),
+                                                              np.array(geom_bb.exterior.coords[i_ext_coord+1]))
                             if isect is not None:
                                 isects.append(isect)
 
@@ -163,6 +164,8 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
 
         region_polys[i_reg] = p
 
+    pts_region = get_points_to_poly_assignments(region_pts)
+
     for i_reg, p in region_polys.items():
         surround_geom_idx = region_surroundings[i_reg]
         union_other_regions = cascaded_union([region_polys[i_other]
@@ -174,8 +177,16 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
         else:
             diff = [diff]
 
-        add = [diff_part for diff_part in diff
-               if isinstance(p.intersection(diff_part), Polygon) and not p.intersection(diff_part).is_empty]
+        neighbor_regions = [pts_region[pt] for pt in region_neighbor_pts[i_reg]]
+        add = []
+        for diff_part in diff:
+            if diff_part.is_valid and not diff_part.is_empty:
+                isect = p.intersection(diff_part)
+                if isinstance(isect, Polygon) and not isect.is_empty:
+                    center_to_center = LineString([p.centroid, diff_part.centroid])
+                    if not any(center_to_center.crosses(region_polys[i_neighb]) for i_neighb in neighbor_regions):
+                        add.append(diff_part)
+
         if add:
             region_polys[i_reg] = cascaded_union([p] + add)
 
