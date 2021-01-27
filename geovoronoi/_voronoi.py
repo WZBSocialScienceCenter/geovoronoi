@@ -111,68 +111,6 @@ def voronoi_regions_from_coords(coords, geo_shape):
     return region_polys, region_pts
 
 
-# def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
-#     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
-#
-#     geom_bb = box(*geom.bounds)
-#     region_linestrings = defaultdict(list)
-#     region_pts = defaultdict(list)
-#
-#     for i_pt, i_region in enumerate(vor.point_region):
-#         region_pts[i_region].append(i_pt)
-#
-#     for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
-#         simplex = np.asarray(simplex)
-#         for side in (0, 1):
-#             if side == 1:
-#                 pointidx = pointidx[::-1]
-#
-#             i_pt = pointidx[0]
-#             i_reg = vor.point_region[i_pt]
-#
-#             if np.all(simplex >= 0):       # full finite polygon line
-#                 region_linestrings[i_reg].append(LineString(vor.vertices[simplex]))
-#             else:   # "loose ridge": contains infinite Voronoi vertex
-#                 i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
-#
-#                 t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
-#                 t /= np.linalg.norm(t)
-#                 n = np.array([-t[1], t[0]])  # normal
-#
-#                 midpoint = vor.points[pointidx].mean(axis=0)
-#                 direction = np.sign(np.dot(midpoint - center, n)) * n
-#                 #direction = direction / np.linalg.norm(direction)   # to unit vector
-#
-#                 isects = []
-#                 for i_ext_coord in range(len(geom_bb.exterior.coords) - 1):
-#                     isect = line_segment_intersection(midpoint, direction,
-#                                                       np.array(geom_bb.exterior.coords[i_ext_coord]),
-#                                                       np.array(geom_bb.exterior.coords[i_ext_coord + 1]))
-#                     if isect is not None:
-#                         isects.append(isect)
-#
-#                 assert isects, 'far point must intersect with surrounding geometry from `geo_shape`'
-#
-#                 if len(isects) == 1:
-#                     far_point = isects[0]
-#                 else:
-#                     closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
-#                     far_point = isects[closest_isect_idx]
-#
-#                 region_linestrings[i_reg].append(LineString(np.vstack((vor.vertices[i], far_point))))
-#
-#     region_polys = {}
-#     for i_reg, linestrings in region_linestrings.items():
-#         p = list(polygonize(linestrings))
-#         # TODO: check p
-#         region_polys[i_reg] = p[0] if p else None
-#
-#     if return_point_assignments:
-#         return region_polys, region_pts
-#     else:
-#         return region_polys
-
-
 def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
     geom_bb = box(*geom.bounds)
     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
@@ -181,6 +119,10 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
     region_pts = defaultdict(list)
     region_neighbor_pts = defaultdict(set)
     region_polys = {}
+
+    logger.info('generating polygons')
+
+    covered_area = 0
     for i_reg, reg_vert in enumerate(vor.regions):
         pt_indices, = np.nonzero(vor.point_region == i_reg)
         if len(pt_indices) == 0:  # skip regions w/o points in them
@@ -247,9 +189,19 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
                                                                   'empty after  intersection with the surrounding ' \
                                                                   'geometry from `geo_shape`'
 
+        covered_area += p.area
+
         region_polys[i_reg] = p
 
-    for i_reg, p in region_polys.items():
+    uncovered_area_portion = (geom.area - covered_area) / geom.area
+    polys_iter = iter(region_polys.items())
+    while not np.isclose(uncovered_area_portion, 0) and uncovered_area_portion > 0:
+        try:
+            i_reg, p = next(polys_iter)
+        except StopIteration:
+            break
+        logger.info('will fill up %f%% uncovered area' % (uncovered_area_portion * 100))
+
         union_other_regions = cascaded_union([other_poly
                                               for i_other, other_poly in region_polys.items()
                                               if i_reg != i_other])
@@ -268,9 +220,14 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
                     center_to_center = LineString([p.centroid, diff_part.centroid])
                     if not any(center_to_center.crosses(region_polys[i_neighb]) for i_neighb in neighbor_regions):
                         add.append(diff_part)
+                        covered_area += (diff_part.area - p.area)
 
         if add:
             region_polys[i_reg] = cascaded_union([p] + add)
+
+        uncovered_area_portion = (geom.area - covered_area) / geom.area
+
+    logger.info('%f%% uncovered area left' % (uncovered_area_portion * 100))
 
     if return_point_assignments:
         return region_polys, region_pts

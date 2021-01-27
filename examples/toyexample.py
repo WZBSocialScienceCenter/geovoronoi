@@ -1,3 +1,5 @@
+import logging
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -6,13 +8,18 @@ from shapely.geometry import Polygon
 from geovoronoi import voronoi_regions_from_coords
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
+logging.basicConfig(level=logging.INFO)
+geovoronoi_log = logging.getLogger('geovoronoi')
+geovoronoi_log.setLevel(logging.INFO)
+geovoronoi_log.propagate = True
+
 #%%
 
-points = np.array([[0, 0], [0, 1], [0, 2],
-                   [1, 0], [1, 1], [1, 2],
-                   [2, 0], [2, 1], [2, 2]])
+# points = np.array([[0, 0], [0, 1], [0, 2],
+#                    [1, 0], [1, 1], [1, 2],
+#                    [2, 0], [2, 1], [2, 2]])
 
-#points = np.array([[1, 1], [1.1, 0.9], [1.15, 0.8], [2.5, 0]])
+points = np.array([[1, 1], [1.1, 0.9], [1.15, 0.8], [2.5, 0]])
 
 shape = Polygon([[-1, -1], [3, -1], [3, 3], [-1, 3]])
 
