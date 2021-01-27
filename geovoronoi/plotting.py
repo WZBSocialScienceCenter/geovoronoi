@@ -44,15 +44,22 @@ def generate_n_colors(n, cmap_name='tab20'):
     return [pt_region_colormap(i % max_i) for i in range(n)]
 
 
-def colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments, cmap_name='tab20'):
+def colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments, points=None, cmap_name='tab20'):
     """
     Generate colors for the shapes and points in `poly_shapes` and `poly_to_pt_assignments` using matplotlib color
     map `cmap_name`.
     """
     vor_colors = {p_id: col
                   for p_id, col in zip(poly_shapes.keys(), generate_n_colors(len(poly_shapes), cmap_name=cmap_name))}
-    pt_to_poly = sorted(get_points_to_poly_assignments(poly_to_pt_assignments).items(), key=lambda x: x[0])
-    pt_colors = [vor_colors[i_vor] for _, i_vor in pt_to_poly]
+
+    pt_to_poly = get_points_to_poly_assignments(poly_to_pt_assignments)
+
+    if points is not None:
+        pt_to_poly.update({i_pt: None for i_pt in range(len(points)) if i_pt not in pt_to_poly.keys()})
+
+    pt_to_poly = sorted(pt_to_poly.items(), key=lambda x: x[0])
+
+    pt_colors = ['black' if i_vor is None else vor_colors[i_vor] for _, i_vor in pt_to_poly]
 
     assert len(vor_colors) <= len(pt_colors)
 
@@ -90,7 +97,6 @@ def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None,
                              % (n_labels, n_features))
 
         for (i, p), lbl in zip(poly_shapes.items(), labels):
-            if not p: continue
             tx, ty = p.centroid.coords[0]
             ax.text(tx, ty, lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
 
@@ -175,6 +181,7 @@ def plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, points, 
     if voronoi_and_points_cmap and poly_to_pt_assignments and \
             not all(map(bool, (voronoi_color, voronoi_edgecolor, points_color))):
         voronoi_color, points_color = colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments,
+                                                                          points=points,
                                                                           cmap_name=voronoi_and_points_cmap)
 
     if voronoi_color is None and voronoi_edgecolor is None:
@@ -266,7 +273,7 @@ def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
     if 'markersize' in kwargs:
         del kwargs['markersize']
 
-    collection = PatchCollection([PolygonPatch(poly) for poly in geoms if poly],
+    collection = PatchCollection([PolygonPatch(poly) for poly in geoms],
                                  color=color_values, **kwargs)
 
     ax.add_collection(collection, autolim=True)

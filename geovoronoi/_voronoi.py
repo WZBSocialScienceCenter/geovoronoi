@@ -11,6 +11,7 @@ from collections import defaultdict
 
 import numpy as np
 from scipy.spatial import Voronoi
+from scipy.spatial.qhull import QhullError
 from scipy.spatial.distance import cdist
 from shapely.geometry import box, LineString, asPoint, MultiPoint, Polygon, MultiPolygon
 from shapely.errors import TopologicalError
@@ -85,7 +86,14 @@ def voronoi_regions_from_coords(coords, geo_shape):
         pts_indices.difference_update(pts_in_geom)
 
         logger.info('generating Voronoi regions')
-        vor = Voronoi(coords[pts_in_geom])
+        try:
+            vor = Voronoi(coords[pts_in_geom])
+        except QhullError as exc:
+            if exc.args and 'QH6214' in exc.args[0]:
+                logger.error('not enough input points (%d) for Voronoi generation; original error message: %s' %
+                             (len(pts_in_geom), exc.args[0]))
+                continue
+            raise exc
 
         logger.info('generating Voronoi region polygons')
         geom_polys, geom_pts = region_polygons_from_voronoi(vor, geom, return_point_assignments=True)
