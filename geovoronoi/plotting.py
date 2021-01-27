@@ -90,6 +90,7 @@ def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None,
                              % (n_labels, n_features))
 
         for (i, p), lbl in zip(poly_shapes.items(), labels):
+            if not p: continue
             tx, ty = p.centroid.coords[0]
             ax.text(tx, ty, lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
 
@@ -265,7 +266,7 @@ def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
     if 'markersize' in kwargs:
         del kwargs['markersize']
 
-    collection = PatchCollection([PolygonPatch(poly) for poly in geoms],
+    collection = PatchCollection([PolygonPatch(poly) for poly in geoms if poly],
                                  color=color_values, **kwargs)
 
     ax.add_collection(collection, autolim=True)

@@ -60,19 +60,12 @@ def voronoi_regions_from_coords(coords, geo_shape):
 
     logger.info('running Voronoi tesselation for %d points' % len(coords))
 
-    if not isinstance(coords, np.ndarray):
-        coords = points_to_coords(coords)
+    if isinstance(coords, np.ndarray):
+        pts = coords_to_points(coords)
+    else:
+        pts = coords
+        coords = points_to_coords(pts)
 
-    vor = Voronoi(coords)
-    logger.info('generated %d Voronoi regions' % (len(vor.regions)-1))
-
-    logger.info('generating Voronoi polygon regions')
-    region_polys, region_pts = region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=True)
-
-    return region_polys, region_pts
-
-
-def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False):
     if isinstance(geo_shape, Polygon):
         geoms = [geo_shape]
     elif isinstance(geo_shape, MultiPolygon):
@@ -80,33 +73,112 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
     else:
         raise ValueError('`geo_shape` must be a Polygon or MultiPolygon')
 
+    pts_indices = set(range(len(pts)))
+    region_polys = {}
+    region_pts = {}
+    for i_geom, geom in enumerate(geoms):
+        pts_in_geom = [i for i in pts_indices if geom.contains(pts[i])]
+        logger.info('%d of %d points in geometry #%d of %d' % (len(pts_in_geom), len(pts), i_geom + 1, len(geoms)))
+        if not pts_in_geom:
+            continue
+
+        pts_indices.difference_update(pts_in_geom)
+
+        logger.info('generating Voronoi regions')
+        vor = Voronoi(coords[pts_in_geom])
+
+        logger.info('generating Voronoi region polygons')
+        geom_polys, geom_pts = region_polygons_from_voronoi(vor, geom, return_point_assignments=True)
+
+        region_ids = range(len(region_polys), len(region_polys) + len(geom_polys))
+        region_ids_mapping = dict(zip(region_ids, geom_polys.keys()))
+        region_polys.update(dict(zip(region_ids, geom_polys.values())))
+
+        pt_ids_mapping = dict(zip(range(len(pts_in_geom)), pts_in_geom))
+        region_pts.update(
+            {reg_id: [pt_ids_mapping[pt_id] for pt_id in geom_pts[old_reg_id]]
+                     for reg_id, old_reg_id in region_ids_mapping.items()}
+        )
+
+    return region_polys, region_pts
+
+
+# def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
+#     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
+#
+#     geom_bb = box(*geom.bounds)
+#     region_linestrings = defaultdict(list)
+#     region_pts = defaultdict(list)
+#
+#     for i_pt, i_region in enumerate(vor.point_region):
+#         region_pts[i_region].append(i_pt)
+#
+#     for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
+#         simplex = np.asarray(simplex)
+#         for side in (0, 1):
+#             if side == 1:
+#                 pointidx = pointidx[::-1]
+#
+#             i_pt = pointidx[0]
+#             i_reg = vor.point_region[i_pt]
+#
+#             if np.all(simplex >= 0):       # full finite polygon line
+#                 region_linestrings[i_reg].append(LineString(vor.vertices[simplex]))
+#             else:   # "loose ridge": contains infinite Voronoi vertex
+#                 i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
+#
+#                 t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
+#                 t /= np.linalg.norm(t)
+#                 n = np.array([-t[1], t[0]])  # normal
+#
+#                 midpoint = vor.points[pointidx].mean(axis=0)
+#                 direction = np.sign(np.dot(midpoint - center, n)) * n
+#                 #direction = direction / np.linalg.norm(direction)   # to unit vector
+#
+#                 isects = []
+#                 for i_ext_coord in range(len(geom_bb.exterior.coords) - 1):
+#                     isect = line_segment_intersection(midpoint, direction,
+#                                                       np.array(geom_bb.exterior.coords[i_ext_coord]),
+#                                                       np.array(geom_bb.exterior.coords[i_ext_coord + 1]))
+#                     if isect is not None:
+#                         isects.append(isect)
+#
+#                 assert isects, 'far point must intersect with surrounding geometry from `geo_shape`'
+#
+#                 if len(isects) == 1:
+#                     far_point = isects[0]
+#                 else:
+#                     closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
+#                     far_point = isects[closest_isect_idx]
+#
+#                 region_linestrings[i_reg].append(LineString(np.vstack((vor.vertices[i], far_point))))
+#
+#     region_polys = {}
+#     for i_reg, linestrings in region_linestrings.items():
+#         p = list(polygonize(linestrings))
+#         # TODO: check p
+#         region_polys[i_reg] = p[0] if p else None
+#
+#     if return_point_assignments:
+#         return region_polys, region_pts
+#     else:
+#         return region_polys
+
+
+def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
+    geom_bb = box(*geom.bounds)
     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
     ridge_vert = np.array(vor.ridge_vertices)
 
     region_pts = defaultdict(list)
     region_neighbor_pts = defaultdict(set)
     region_polys = {}
-    region_surroundings = {}
-    surroundings_region = defaultdict(list)
     for i_reg, reg_vert in enumerate(vor.regions):
-        pt_indices = np.where(vor.point_region == i_reg)[0]
+        pt_indices, = np.nonzero(vor.point_region == i_reg)
         if len(pt_indices) == 0:  # skip regions w/o points in them
             continue
 
         region_pts[i_reg].extend(pt_indices.tolist())
-
-        geom_indices = {i_g for pt in vor.points[pt_indices] for i_g, g in enumerate(geoms) if g.contains(asPoint(pt))}
-        if len(geom_indices) == 0:
-            raise RuntimeError('no sub-geometry of `geo_shape` contains a point of %s' % str(vor.points[pt_indices]))
-        elif len(geom_indices) > 1:
-            raise RuntimeError('more than one sub-geometry of `geo_shape` contains a point of %s'
-                               % str(vor.points[pt_indices]))
-
-        geom_idx = geom_indices.pop()
-        geom = geoms[geom_idx]
-        geom_bb = box(*geom.bounds)
-        surroundings_region[geom_idx].append(i_reg)
-        region_surroundings[i_reg] = geom_idx
 
         if np.all(np.array(reg_vert) >= 0):  # fully finite-bounded region
             p = Polygon(vor.vertices[reg_vert])
@@ -128,32 +200,37 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
                         i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
                         finite_pt = vor.vertices[i]
 
-                        if ridge_pt_side == 1:
-                            pointidx = pointidx[::-1]
+                        if geom_bb.contains(asPoint(finite_pt)):
+                            # if ridge_pt_side == 1:
+                            #     pointidx = pointidx[::-1]
 
-                        t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
-                        t /= np.linalg.norm(t)
-                        n = np.array([-t[1], t[0]])  # normal
+                            t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
+                            t /= np.linalg.norm(t)
+                            n = np.array([-t[1], t[0]])  # normal
 
-                        midpoint = vor.points[pointidx].mean(axis=0)
-                        direction = np.sign(np.dot(midpoint - center, n)) * n
-                        direction = direction / np.linalg.norm(direction)  # to unit vector
+                            midpoint = vor.points[pointidx].mean(axis=0)
+                            direction = np.sign(np.dot(midpoint - center, n)) * n
+                            # direction = direction / np.linalg.norm(direction)  # to unit vector
 
-                        isects = []
-                        for i_ext_coord in range(len(geom_bb.exterior.coords) - 1):
-                            isect = line_segment_intersection(midpoint, direction,
-                                                              np.array(geom_bb.exterior.coords[i_ext_coord]),
-                                                              np.array(geom_bb.exterior.coords[i_ext_coord+1]))
-                            if isect is not None:
-                                isects.append(isect)
+                            isects = []
+                            for i_ext_coord in range(len(geom_bb.exterior.coords) - 1):
+                                isect = line_segment_intersection(midpoint, direction,
+                                                                  np.array(geom_bb.exterior.coords[i_ext_coord]),
+                                                                  np.array(geom_bb.exterior.coords[i_ext_coord+1]))
+                                if isect is not None:
+                                    isects.append(isect)
 
-                        assert isects, 'far point must intersect with surrounding geometry from `geo_shape`'
+                            assert isects, 'far point must intersect with surrounding geometry from `geo_shape`'
 
-                        closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
-                        p_vertices.extend([finite_pt, isects[closest_isect_idx]])
+                            closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
+                            p_vertices.extend([finite_pt, isects[closest_isect_idx]])
+                        else:
+                            p_vertices.append(finite_pt)
 
-            p = MultiPoint(p_vertices).convex_hull  # Voronoi regions are convex
+            #p = MultiPoint(p_vertices).convex_hull  # Voronoi regions are convex
+            p = MultiPoint(p_vertices + [vor.points[i_pt]]).convex_hull  # Voronoi regions are convex
 
+        assert isinstance(p, Polygon), 'generated convex hull is not a polygon'
         assert p.is_valid and p.is_simple and not p.is_empty, 'generated polygon is not valid, not simple or empty'
 
         if not geom.contains(p):
@@ -164,20 +241,17 @@ def region_polygons_from_voronoi(vor, geo_shape, return_point_assignments=False)
 
         region_polys[i_reg] = p
 
-    pts_region = get_points_to_poly_assignments(region_pts)
-
     for i_reg, p in region_polys.items():
-        surround_geom_idx = region_surroundings[i_reg]
-        union_other_regions = cascaded_union([region_polys[i_other]
-                                              for i_other in surroundings_region[surround_geom_idx]
+        union_other_regions = cascaded_union([other_poly
+                                              for i_other, other_poly in region_polys.items()
                                               if i_reg != i_other])
-        diff = geoms[surround_geom_idx].difference(union_other_regions)
+        diff = geom.difference(union_other_regions)
         if isinstance(diff, MultiPolygon):
             diff = diff.geoms
         else:
             diff = [diff]
 
-        neighbor_regions = [pts_region[pt] for pt in region_neighbor_pts[i_reg]]
+        neighbor_regions = [vor.point_region[pt] for pt in region_neighbor_pts[i_reg]]
         add = []
         for diff_part in diff:
             if diff_part.is_valid and not diff_part.is_empty:

@@ -8,11 +8,11 @@ from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_
 
 #%%
 
-# points = np.array([[0, 0], [0, 1], [0, 2],
-#                    [1, 0], [1, 1], [1, 2],
-#                    [2, 0], [2, 1], [2, 2]])
+points = np.array([[0, 0], [0, 1], [0, 2],
+                   [1, 0], [1, 1], [1, 2],
+                   [2, 0], [2, 1], [2, 2]])
 
-points = np.array([[1, 1], [2, 0], [0, 2], [0, 0]])
+#points = np.array([[1, 1], [1.1, 0.9], [1.15, 0.8], [2.5, 0]])
 
 shape = Polygon([[-1, -1], [3, -1], [3, 3], [-1, 3]])
 
@@ -25,7 +25,7 @@ print(region_pts)
 
 #%%
 
-fig, ax = subplot_for_map()
+fig, ax = subplot_for_map(show_x_axis=True, show_y_axis=True)
 
 plot_voronoi_polys_with_points_in_area(ax, shape, region_polys, points, region_pts,
                                        point_labels=list(map(str, range(len(points)))),
