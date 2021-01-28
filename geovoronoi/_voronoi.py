@@ -32,7 +32,7 @@ def points_to_coords(pts):
     return np.array([p.coords[0] for p in pts])
 
 
-def voronoi_regions_from_coords(coords, geo_shape, per_geom=True):
+def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassigned_points=False):
     """
     Calculate Voronoi regions from NumPy array of 2D coordinates `coord` that lie within a shape `geo_shape`. Setting
     `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully cover `geo_shape`. Set this
@@ -76,6 +76,7 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True):
     pts_indices = set(range(len(pts)))
     region_polys = {}
     region_pts = {}
+    unassigned_pts = set()
     for i_geom, geom in enumerate(geoms):
         pts_in_geom = [i for i in pts_indices if geom.contains(pts[i])]
         logger.info('%d of %d points in geometry #%d of %d' % (len(pts_in_geom), len(pts), i_geom + 1, len(geoms)))
@@ -91,6 +92,7 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True):
             if exc.args and 'QH6214' in exc.args[0]:
                 logger.error('not enough input points (%d) for Voronoi generation; original error message: %s' %
                              (len(pts_in_geom), exc.args[0]))
+                unassigned_pts.update(pts_in_geom)
                 continue
             raise exc
 
@@ -107,7 +109,10 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True):
                      for reg_id, old_reg_id in region_ids_mapping.items()}
         )
 
-    return region_polys, region_pts
+    if return_unassigned_points:
+        return region_polys, region_pts, unassigned_pts
+    else:
+        return region_polys, region_pts
 
 
 def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
@@ -150,30 +155,31 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
                         finite_pt = vor.vertices[i]
                         p_vert_indices.add(i)
 
-                        # only add a far point if the finite end is not outside the bounding box already
-                        if geom_bb.contains(asPoint(finite_pt)):
-                            t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
-                            t /= np.linalg.norm(t)
-                            n = np.array([-t[1], t[0]])  # normal
+                        t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
+                        t /= np.linalg.norm(t)
+                        n = np.array([-t[1], t[0]])  # normal
 
-                            midpoint = vor.points[pointidx].mean(axis=0)
-                            direction = np.sign(np.dot(midpoint - center, n)) * n
+                        midpoint = vor.points[pointidx].mean(axis=0)
+                        direction = np.sign(np.dot(midpoint - center, n)) * n
 
-                            isects = []
-                            for i_ext_coord in range(len(geom_bb.exterior.coords) - 1):
-                                isect = line_segment_intersection(midpoint, direction,
-                                                                  np.array(geom_bb.exterior.coords[i_ext_coord]),
-                                                                  np.array(geom_bb.exterior.coords[i_ext_coord+1]))
-                                if isect is not None:
-                                    isects.append(isect)
+                        isects = []
+                        for i_ext_coord in range(len(geom_bb.exterior.coords) - 1):
+                            isect = line_segment_intersection(midpoint, direction,
+                                                              np.array(geom_bb.exterior.coords[i_ext_coord]),
+                                                              np.array(geom_bb.exterior.coords[i_ext_coord+1]))
+                            if isect is not None:
+                                isects.append(isect)
 
-                            if len(isects) == 0:
-                                raise RuntimeError('far point must intersect with surrounding geometry from `geom`')
-                            elif len(isects) == 1:
-                                p_vert_farpoints.add(tuple(isects[0]))
-                            else:
-                                closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
-                                p_vert_farpoints.add(tuple(isects[closest_isect_idx]))
+                        if len(isects) == 0:
+                            raise RuntimeError('far point must intersect with surrounding geometry from `geom`')
+                        elif len(isects) == 1:
+                            far_pt = isects[0]
+                        else:
+                            closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
+                            far_pt = isects[closest_isect_idx]
+
+                        if (far_pt - finite_pt)[0] / direction[0] > 0:   # only if in same direction
+                            p_vert_farpoints.add(tuple(far_pt))
 
             # create the Voronoi region polygon as convex hull of the ridge vertices and far points (Voronoi regions
             # are convex)
@@ -181,7 +187,7 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
             p_pts = vor.vertices[np.asarray(list(p_vert_indices))]
             # adding the point itself prevents generating invalid hull (otherwise sometimes the hull becomes a line
             # if the vertices are almost colinear)
-            p_pts = np.vstack((p_pts, vor.points[i_pt]))
+            p_pts = np.vstack((p_pts, vor.points[pt_indices]))
             if p_vert_farpoints:
                 p_pts = np.vstack((p_pts, np.asarray(list(p_vert_farpoints))))
 

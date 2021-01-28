@@ -25,7 +25,7 @@ geovoronoi_log.propagate = True
 
 #%%
 
-N_POINTS = 100
+N_POINTS = 105
 COUNTRY = 'Italy'
 
 np.random.seed(123)
@@ -56,13 +56,23 @@ print('will use %d of %d randomly generated points that are inside geographic ar
 #%%
 
 #
-# calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
+# Calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
+# Note how in Sardinia there's only one point which is not assigned to any Voronoi region.
+# Since by default all sub-geometries (i.e. islands or other isolated features) in the geographic shape
+# are treated separately (set `per_geom=False` to change this) and you need more than one point to generate
+# a Voronoi region, this point is left unassigned. By setting `return_unassigned_points=True`, we can get a
+# set of unassigned point indices:
 #
 
-poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(pts, area_shape)
+poly_shapes, poly_to_pt_assignments, unassigned_pts = voronoi_regions_from_coords(pts, area_shape,
+                                                                                  return_unassigned_points=True)
 
 print('Voronoi region to point assignments:')
 pprint(poly_to_pt_assignments)
+
+print('Unassigned points:')
+for i_pt in unassigned_pts:
+    print('#%d: %.2f, %.2f' % (i_pt, pts[i_pt].x, pts[i_pt].y))
 
 #%%
 

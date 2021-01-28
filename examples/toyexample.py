@@ -28,6 +28,7 @@ geovoronoi_log.propagate = True
 #                    [2, 0], [2, 1], [2, 2]])
 
 points = np.array([[1, 1], [1.1, 0.9], [1.15, 0.8], [2.5, 0]])
+#points = np.array([[1, 1], [1.1, 0.91], [1.2, 0.8]])
 
 # surrounding shape
 shape = Polygon([[-1, -1], [3, -1], [3, 3], [-1, 3]])
