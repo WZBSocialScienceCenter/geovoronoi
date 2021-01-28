@@ -99,7 +99,7 @@ pt_labels = list(map(str, count_per_pt.values()))
 distinct_pt_coords = coords[np.asarray(list(count_per_pt.keys()))]
 
 # highlight voronoi regions with point duplicates
-vor_colors = {i_poly: 'red' if len(pt_indices) > 1 else 'blue'
+vor_colors = {i_poly: (1,0,0) if len(pt_indices) > 1 else (0,0,1)
               for i_poly, pt_indices in poly_to_pt_assignments.items()}
 
 fig, ax = subplot_for_map()
@@ -108,7 +108,7 @@ plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, distinct_pt_
                                        plot_voronoi_opts={'alpha': 0.2},
                                        plot_points_opts={'alpha': 0.4},
                                        voronoi_color=vor_colors,
-                                       voronoi_edgecolor='black',
+                                       voronoi_edgecolor=(0,0,0,1),
                                        point_labels=pt_labels,
                                        points_markersize=np.square(np.array(list(count_per_pt.values())))*10)
 

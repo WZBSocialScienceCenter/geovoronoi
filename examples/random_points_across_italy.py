@@ -17,6 +17,17 @@ import geopandas as gpd
 from geovoronoi import coords_to_points, voronoi_regions_from_coords
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
+import traceback
+import warnings
+import sys
+
+def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
+
+    log = file if hasattr(file,'write') else sys.stderr
+    traceback.print_stack(file=log)
+    log.write(warnings.formatwarning(message, category, filename, lineno, line))
+
+warnings.showwarning = warn_with_traceback
 
 logging.basicConfig(level=logging.INFO)
 geovoronoi_log = logging.getLogger('geovoronoi')

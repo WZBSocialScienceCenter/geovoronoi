@@ -59,7 +59,7 @@ def colors_for_voronoi_polys_and_points(poly_shapes, poly_to_pt_assignments, poi
 
     pt_to_poly = sorted(pt_to_poly.items(), key=lambda x: x[0])
 
-    pt_colors = ['black' if i_vor is None else vor_colors[i_vor] for _, i_vor in pt_to_poly]
+    pt_colors = [(0,0,0,1) if i_vor is None else vor_colors[i_vor] for _, i_vor in pt_to_poly]
 
     assert len(vor_colors) <= len(pt_colors)
 
@@ -154,7 +154,7 @@ def plot_polygon(ax, polygon, facecolor=None, edgecolor=None, linewidth=1, lines
 
 
 def plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, points, poly_to_pt_assignments=None,
-                                           area_color='white', area_edgecolor='black',
+                                           area_color=(1,1,1,1), area_edgecolor=(0,0,0,1),
                                            voronoi_and_points_cmap='tab20',
                                            voronoi_color=None, voronoi_edgecolor=None,
                                            points_color=None, points_markersize=5, points_marker='o',
@@ -185,7 +185,7 @@ def plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, points, 
                                                                           cmap_name=voronoi_and_points_cmap)
 
     if voronoi_color is None and voronoi_edgecolor is None:
-        voronoi_edgecolor = 'black'   # better visible default value
+        voronoi_edgecolor = (0,0,0,1)   # better visible default value
 
     plot_voronoi_polys(ax, poly_shapes, color=voronoi_color, edgecolor=voronoi_edgecolor,
                        labels=voronoi_labels, label_fontsize=voronoi_label_fontsize, label_color=voronoi_label_color,
@@ -206,7 +206,7 @@ def _color_for_labels(label_color, default_color, seq_index):
     else:
         c = label_color
 
-    return c or 'black'
+    return c or (0,0,0,1)
 
 
 def _plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):

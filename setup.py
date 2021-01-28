@@ -8,11 +8,24 @@ from setuptools import setup
 GITHUB_URL = 'https://github.com/WZBSocialScienceCenter/geovoronoi'
 
 __title__ = 'geovoronoi'
-__version__ = '0.2.0'
+__version__ = '0.3.0dev'
 __author__ = 'Markus Konrad'
 __license__ = 'Apache License 2.0'
 
 here = os.path.abspath(os.path.dirname(__file__))
+
+DEPS_BASE = ['numpy>=1.19.0,<2', 'scipy>=1.6.0,<1.7', 'shapely>=1.7.0,<1.8']
+
+DEPS_EXTRA = {
+    'plotting': ['matplotlib>=3.3.0,<3.4', 'geopandas>=0.8.0,<0.9', 'descartes>=1.1.0,<1.2'],
+    'test': ['pytest>=6.2.0,<6.3', 'pytest-mpl>=0.12,<0.13', 'hypothesis>=6.0.0,<6.1', 'tox>=3.21.0,<3.22'],
+    'develop': ['ipython>=7.19.0', 'twine>=3.3.0'],
+}
+
+DEPS_EXTRA['all'] = []
+for k, deps in DEPS_EXTRA.items():
+    if k != 'all':
+        DEPS_EXTRA['all'].extend(deps)
 
 # Get the long description from the README file
 with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
@@ -43,10 +56,10 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
 
         'Topic :: Scientific/Engineering :: Information Analysis',
         'Topic :: Software Development :: Libraries :: Python Modules',
@@ -58,10 +71,6 @@ setup(
     packages=['geovoronoi'],
     # include_package_data=True,
     python_requires='>=3.6',
-    install_requires=['numpy>=1.18.0', 'scipy>=1.4.0', 'shapely>=1.7.0'],
-    extras_require={
-        'plotting': ['matplotlib>=3.2.0', 'geopandas>=0.7.0', 'descartes>=1.1.0'],
-        'test': ['pytest>=5.3.0', 'pytest-mpl>=0.11', 'hypothesis>=5.6.0', 'tox>=3.14.0'],
-        'develop': ['ipython>=7.0.0', 'twine>=3.1.0'],
-    }
+    install_requires=DEPS_BASE,
+    extras_require=DEPS_EXTRA
 )
