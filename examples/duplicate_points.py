@@ -4,7 +4,7 @@ Example script to show how to handle duplicate points for which Voronoi regions 
 Duplicate points, i.e. points with exactly the same coordinates will belong to the same Voronoi region.
 
 Author: Markus Konrad <markus.konrad@wzb.eu>
-January 2020
+January 2021
 """
 
 

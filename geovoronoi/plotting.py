@@ -96,9 +96,9 @@ def plot_voronoi_polys(ax, poly_shapes, color=None, edgecolor=None, labels=None,
             raise ValueError('number of labels (%d) must match number of Voronoi polygons (%d)'
                              % (n_labels, n_features))
 
-        for (i, p), lbl in zip(poly_shapes.items(), labels):
+        for i, p in poly_shapes.items():
             tx, ty = p.centroid.coords[0]
-            ax.text(tx, ty, lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
+            ax.text(tx, ty, labels[i], fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
 
 
 def plot_points(ax, points, markersize=1, marker='o', color=None, labels=None, label_fontsize=7, label_color=None,
@@ -123,10 +123,10 @@ def plot_points(ax, points, markersize=1, marker='o', color=None, labels=None, l
                              % (n_labels, n_features))
 
         drawn_coords = set()
-        for i, (x_i, y_i, lbl) in enumerate(zip(x, y, labels)):
+        for i, (x_i, y_i) in enumerate(zip(x, y)):
             pos = (x_i, y_i)  # make hashable
             if label_draw_duplicates or pos not in drawn_coords:
-                ax.text(x_i, y_i, lbl, fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
+                ax.text(x_i, y_i, labels[i], fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
                 drawn_coords.add(pos)
 
 

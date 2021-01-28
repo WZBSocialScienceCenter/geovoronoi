@@ -3,7 +3,7 @@ Example script that scatters random points across a country and generates the Vo
 and their points will be plotted using the `plotting` sub-module of `geovoronoi`.
 
 Author: Markus Konrad <markus.konrad@wzb.eu>
-March 2018
+January 2021
 """
 
 

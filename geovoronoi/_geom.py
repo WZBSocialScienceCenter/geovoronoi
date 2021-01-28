@@ -76,8 +76,6 @@ def calculate_polygon_areas(poly_shapes, m2_to_km2=False):
     Return the area of the respective polygons in `poly_shapes`. Returns a NumPy array of areas in m² (if `m2_to_km2` is
     False) or km² (otherwise).
     """
-    areas = np.array([p.area for p in poly_shapes])
-    if m2_to_km2:
-        return areas / 1000000    # = 1000²
-    else:
-        return areas
+
+    unit_convert = 1000000 if m2_to_km2 else 1
+    return {i_poly: p.area / unit_convert for i_poly, p in poly_shapes.items()}

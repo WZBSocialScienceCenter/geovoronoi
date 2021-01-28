@@ -6,10 +6,11 @@ the area (km²) for those regions will be calculated. Both the regions and their
 Note that it is important to use an *equal area* projection before calculating the areas of the Voronoi regions!
 
 Author: Markus Konrad <markus.konrad@wzb.eu>
-March 2018
+January 2021
 """
 
 import logging
+from pprint import pprint
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,6 +24,8 @@ logging.basicConfig(level=logging.INFO)
 geovoronoi_log = logging.getLogger('geovoronoi')
 geovoronoi_log.setLevel(logging.INFO)
 geovoronoi_log.propagate = True
+
+#%%
 
 N_POINTS = 20
 COUNTRY = 'Spain'
@@ -48,26 +51,31 @@ coords = np.vstack((randx, randy)).T
 
 # use only the points inside the geographic area
 pts = [p for p in coords_to_points(coords) if p.within(area_shape)]  # converts to shapely Point
+n_pts = len(pts)
 
-print('will use %d of %d randomly generated points that are inside geographic area' % (len(pts), N_POINTS))
+print('will use %d of %d randomly generated points that are inside geographic area' % (n_pts, N_POINTS))
 coords = points_to_coords(pts)   # convert back to simple NumPy coordinate array
 
 del pts
+
+#%%
 
 #
 # calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
 #
 
-poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
+poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
 
 # calculate area in km², too
 poly_areas = calculate_polygon_areas(poly_shapes, m2_to_km2=True)   # converts m² to km²
 
 print('areas in km²:')
-print(poly_areas)
+pprint(poly_areas)
 
 print('sum:')
-print(sum(poly_areas))
+print(sum(poly_areas.values()))
+
+#%%
 
 #
 # plotting
@@ -75,12 +83,12 @@ print(sum(poly_areas))
 
 fig, ax = subplot_for_map(show_x_axis=True, show_y_axis=True)
 
-voronoi_labels = ['%d km²' % round(a) for a in poly_areas]
+voronoi_labels = {poly_i: '%d km²' % round(a) for poly_i, a in poly_areas.items()}
 plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords, poly_to_pt_assignments,
                                        voronoi_labels=voronoi_labels, voronoi_label_fontsize=7,
                                        voronoi_label_color='gray')
 
-ax.set_title('%d random points and their Voronoi regions in %s' % (len(pts), COUNTRY))
+ax.set_title('%d random points and their Voronoi regions in %s' % (n_pts, COUNTRY))
 
 plt.tight_layout()
 plt.savefig('random_points_and_area.png')

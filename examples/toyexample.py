@@ -1,3 +1,11 @@
+"""
+Artificial mini-example useful for debugging.
+
+Author: Markus Konrad <markus.konrad@wzb.eu>
+January 2021
+"""
+
+
 import logging
 
 import matplotlib.pyplot as plt
@@ -21,16 +29,17 @@ geovoronoi_log.propagate = True
 
 points = np.array([[1, 1], [1.1, 0.9], [1.15, 0.8], [2.5, 0]])
 
+# surrounding shape
 shape = Polygon([[-1, -1], [3, -1], [3, 3], [-1, 3]])
 
-#%%
+#%% Voronoi region generation
 
 region_polys, region_pts = voronoi_regions_from_coords(points, shape)
 
 print('Voronoi region to point assignments:')
 print(region_pts)
 
-#%%
+#%% plotting
 
 fig, ax = subplot_for_map(show_x_axis=True, show_y_axis=True)
 

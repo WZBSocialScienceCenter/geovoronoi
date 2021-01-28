@@ -2,7 +2,7 @@
 Example script to show how to incorporate GeoPandas with geovoronoi.
 
 Author: Markus Konrad <markus.konrad@wzb.eu>
-March 2018
+January 2021
 """
 
 import logging
@@ -20,6 +20,8 @@ geovoronoi_log = logging.getLogger('geovoronoi')
 geovoronoi_log.setLevel(logging.INFO)
 geovoronoi_log.propagate = True
 
+#%%
+
 #
 # load geo data
 #
@@ -35,6 +37,7 @@ cities = cities.to_crs(south_am.crs)   # convert city coordinates to same CRS!
 south_am_shape = cascaded_union(south_am.geometry)
 south_am_cities = cities[cities.geometry.within(south_am_shape)]   # reduce to cities in South America
 
+#%%
 
 #
 # calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
@@ -44,8 +47,10 @@ south_am_cities = cities[cities.geometry.within(south_am_shape)]   # reduce to c
 coords = points_to_coords(south_am_cities.geometry)
 
 # calculate the regions
-poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, south_am_shape)
+poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(coords, south_am_shape)
 
+
+#%%
 
 #
 # Plotting
@@ -53,7 +58,8 @@ poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, s
 
 fig, ax = subplot_for_map()
 
-plot_voronoi_polys_with_points_in_area(ax, south_am_shape, poly_shapes, pts, poly_to_pt_assignments)
+plot_voronoi_polys_with_points_in_area(ax, south_am_shape, poly_shapes, coords, poly_to_pt_assignments,
+                                       point_labels=south_am_cities.name.tolist())
 
 ax.set_title('Cities data for South America from GeoPandas\nand Voronoi regions around them')
 
