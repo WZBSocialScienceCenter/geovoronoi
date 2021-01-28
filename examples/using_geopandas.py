@@ -47,7 +47,9 @@ south_am_cities = cities[cities.geometry.within(south_am_shape)]   # reduce to c
 coords = points_to_coords(south_am_cities.geometry)
 
 # calculate the regions
-poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(coords, south_am_shape)
+# we set "per_geom=False" so that the whole continent is treated as one area and Voronoi regions
+# span over to Tierra del Fuego
+poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(coords, south_am_shape, per_geom=False)
 
 
 #%%

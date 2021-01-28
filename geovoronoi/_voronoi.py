@@ -32,7 +32,7 @@ def points_to_coords(pts):
     return np.array([p.coords[0] for p in pts])
 
 
-def voronoi_regions_from_coords(coords, geo_shape):
+def voronoi_regions_from_coords(coords, geo_shape, per_geom=True):
     """
     Calculate Voronoi regions from NumPy array of 2D coordinates `coord` that lie within a shape `geo_shape`. Setting
     `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully cover `geo_shape`. Set this
@@ -57,7 +57,7 @@ def voronoi_regions_from_coords(coords, geo_shape):
     doesn't intersect with `geo_shape`.
     """
 
-    logger.info('running Voronoi tesselation for %d points' % len(coords))
+    logger.info('running Voronoi tesselation for %d points / treating geoms separately: %s' % (len(coords), per_geom))
 
     if isinstance(coords, np.ndarray):
         pts = coords_to_points(coords)
@@ -65,12 +65,13 @@ def voronoi_regions_from_coords(coords, geo_shape):
         pts = coords
         coords = points_to_coords(pts)
 
-    if isinstance(geo_shape, Polygon):
-        geoms = [geo_shape]
-    elif isinstance(geo_shape, MultiPolygon):
-        geoms = geo_shape.geoms
-    else:
+    if not isinstance(geo_shape, (Polygon, MultiPolygon)):
         raise ValueError('`geo_shape` must be a Polygon or MultiPolygon')
+
+    if not per_geom or isinstance(geo_shape, Polygon):
+        geoms = [geo_shape]
+    else:   # Multipolygon
+        geoms = geo_shape.geoms
 
     pts_indices = set(range(len(pts)))
     region_polys = {}
