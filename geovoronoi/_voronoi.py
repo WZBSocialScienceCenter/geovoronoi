@@ -133,46 +133,46 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
         else:
             p_vert_indices = set()
             p_vert_farpoints = set()
-            i_pt = pt_indices[0]  # only consider one point, not a duplicate
-            enclosing_ridge_pts_mask = (vor.ridge_points[:, 0] == i_pt) | (vor.ridge_points[:, 1] == i_pt)
-            for pointidx, simplex in zip(vor.ridge_points[enclosing_ridge_pts_mask],
-                                         ridge_vert[enclosing_ridge_pts_mask]):
+            for i_pt in pt_indices:     # also consider duplicates
+                enclosing_ridge_pts_mask = (vor.ridge_points[:, 0] == i_pt) | (vor.ridge_points[:, 1] == i_pt)
+                for pointidx, simplex in zip(vor.ridge_points[enclosing_ridge_pts_mask],
+                                             ridge_vert[enclosing_ridge_pts_mask]):
 
-                region_neighbor_pts[i_reg].update([x for x in pointidx if x != i_pt])
+                    region_neighbor_pts[i_reg].update([x for x in pointidx if x != i_pt])
 
-                if np.all(simplex >= 0):   # both vertices of the ridge are finite points
-                    p_vert_indices.update(simplex)
-                else:
-                    # "loose ridge": contains infinite Voronoi vertex
-                    # we calculate the far point, i.e. the point of intersection with a surrounding polygon boundary
-                    i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
-                    finite_pt = vor.vertices[i]
-                    p_vert_indices.add(i)
+                    if np.all(simplex >= 0):   # both vertices of the ridge are finite points
+                        p_vert_indices.update(simplex)
+                    else:
+                        # "loose ridge": contains infinite Voronoi vertex
+                        # we calculate the far point, i.e. the point of intersection with a surrounding polygon boundary
+                        i = simplex[simplex >= 0][0]  # finite end Voronoi vertex
+                        finite_pt = vor.vertices[i]
+                        p_vert_indices.add(i)
 
-                    # only add a far point if the finite end is not outside the bounding box already
-                    if geom_bb.contains(asPoint(finite_pt)):
-                        t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
-                        t /= np.linalg.norm(t)
-                        n = np.array([-t[1], t[0]])  # normal
+                        # only add a far point if the finite end is not outside the bounding box already
+                        if geom_bb.contains(asPoint(finite_pt)):
+                            t = vor.points[pointidx[1]] - vor.points[pointidx[0]]  # tangent
+                            t /= np.linalg.norm(t)
+                            n = np.array([-t[1], t[0]])  # normal
 
-                        midpoint = vor.points[pointidx].mean(axis=0)
-                        direction = np.sign(np.dot(midpoint - center, n)) * n
+                            midpoint = vor.points[pointidx].mean(axis=0)
+                            direction = np.sign(np.dot(midpoint - center, n)) * n
 
-                        isects = []
-                        for i_ext_coord in range(len(geom_bb.exterior.coords) - 1):
-                            isect = line_segment_intersection(midpoint, direction,
-                                                              np.array(geom_bb.exterior.coords[i_ext_coord]),
-                                                              np.array(geom_bb.exterior.coords[i_ext_coord+1]))
-                            if isect is not None:
-                                isects.append(isect)
+                            isects = []
+                            for i_ext_coord in range(len(geom_bb.exterior.coords) - 1):
+                                isect = line_segment_intersection(midpoint, direction,
+                                                                  np.array(geom_bb.exterior.coords[i_ext_coord]),
+                                                                  np.array(geom_bb.exterior.coords[i_ext_coord+1]))
+                                if isect is not None:
+                                    isects.append(isect)
 
-                        if len(isects) == 0:
-                            raise RuntimeError('far point must intersect with surrounding geometry from `geom`')
-                        elif len(isects) == 1:
-                            p_vert_farpoints.add(tuple(isects[0]))
-                        else:
-                            closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
-                            p_vert_farpoints.add(tuple(isects[closest_isect_idx]))
+                            if len(isects) == 0:
+                                raise RuntimeError('far point must intersect with surrounding geometry from `geom`')
+                            elif len(isects) == 1:
+                                p_vert_farpoints.add(tuple(isects[0]))
+                            else:
+                                closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
+                                p_vert_farpoints.add(tuple(isects[closest_isect_idx]))
 
             # create the Voronoi region polygon as convex hull of the ridge vertices and far points (Voronoi regions
             # are convex)
