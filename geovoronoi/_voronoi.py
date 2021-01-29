@@ -68,6 +68,10 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
     if not isinstance(geo_shape, (Polygon, MultiPolygon)):
         raise ValueError('`geo_shape` must be a Polygon or MultiPolygon')
 
+    if not geo_shape.is_valid:
+        raise ValueError('`geo_shape` is not a valid shape; try applying `.buffer(b)` where `b` is zero '
+                         'or a very small number')
+
     if not per_geom or isinstance(geo_shape, Polygon):
         geoms = [geo_shape]
     else:   # Multipolygon
@@ -196,14 +200,14 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
         if not isinstance(p, Polygon):
             raise RuntimeError('generated convex hull is not a polygon')
 
-        if not p.is_valid or not p.is_simple or p.is_empty:
-            raise RuntimeError('generated polygon is not valid, not simple or empty')
+        if not p.is_valid or p.is_empty:
+            raise RuntimeError('generated polygon is not valid or is empty')
 
         if not geom.contains(p):
             p = p.intersection(geom)
 
-            if not p.is_valid or not p.is_simple or p.is_empty:
-                raise RuntimeError('generated polygon is not valid, not simple or empty after intersection with the'
+            if not p.is_valid or p.is_empty:
+                raise RuntimeError('generated polygon is not valid or is empty after intersection with the'
                                    ' surrounding geometry `geom`')
 
         covered_area += p.area
@@ -253,13 +257,19 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
 
 def get_points_to_poly_assignments(poly_to_pt_assignments):
     """
-    Reverse of poly to points assignments: Returns a list of size N, which is the number of unique points in
-    `poly_to_pt_assignments`. Each list element is an index into the list of Voronoi regions.
+    Reverse Voronoi region polygon IDs to point ID assignments by returning a dict that maps each point ID to its
+    Voronoi region polygon ID. All IDs should be integers.
+
+    :param poly_to_pt_assignments: dict mapping Voronoi region polygon IDs to list of point IDs
+    :return: dict mapping point ID to Voronoi region polygon ID
     """
 
     pt_to_poly = {}
     for poly, pts in poly_to_pt_assignments.items():
         for pt in pts:
+            if pt in pt_to_poly.keys():
+                raise ValueError('invalid assignments in `poly_to_pt_assignments`: '
+                                 'point %d is assigned to several polygons' % pt)
             pt_to_poly[pt] = poly
 
     return pt_to_poly
