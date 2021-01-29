@@ -136,6 +136,8 @@ def test_voronoi_regions_from_coords_italy(n_pts, per_geom, return_unassigned_pt
                     geom_area = area_shape.geoms[i_geom].area
                 else:
                     geom_area = sum(g.area for g in area_shape.geoms)
+                fig, ax = subplot_for_map()
+                plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys_in_geom, coords, region_pts_in_geom)
                 _check_region_polys(region_polys_in_geom.values(), region_pts_in_geom.values(), coords,
                                     expected_sum_area=geom_area)
             else:
@@ -379,4 +381,4 @@ def _check_region_polys(region_polys, region_pts, coords, expected_sum_area, con
 
         sum_area += poly.area
 
-    #assert np.isclose(sum_area, expected_sum_area)
+    assert np.isclose(sum_area, expected_sum_area)

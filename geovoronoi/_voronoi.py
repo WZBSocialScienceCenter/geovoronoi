@@ -144,7 +144,8 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
 
 
 def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
-    geom_bb = box(*geom.bounds)
+    bounds_buf = max(geom.bounds[2] - geom.bounds[0], geom.bounds[3] - geom.bounds[1]) * 0.1
+    geom_bb = box(*geom.bounds).buffer(bounds_buf)
     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
     ridge_vert = np.array(vor.ridge_vertices)
 
@@ -239,11 +240,17 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
 
     uncovered_area_portion = (geom.area - covered_area) / geom.area
     polys_iter = iter(region_polys.items())
+    pass_ = 1
     while not np.isclose(uncovered_area_portion, 0) and uncovered_area_portion > 0:
         try:
             i_reg, p = next(polys_iter)
         except StopIteration:
-            break
+            if pass_ == 1:   # restart w/ second pass
+                polys_iter = iter(region_polys.items())
+                i_reg, p = next(polys_iter)
+                pass_ += 2
+            else:
+                break
         logger.debug('will fill up %f%% uncovered area' % (uncovered_area_portion * 100))
 
         union_other_regions = cascaded_union([other_poly
@@ -259,8 +266,13 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
         add = []
         for diff_part in diff:
             if diff_part.is_valid and not diff_part.is_empty:
-                isect = p.intersection(diff_part)
-                if isinstance(isect, Polygon) and not isect.is_empty:
+                if pass_ == 1:
+                    isect = p.intersection(diff_part)
+                    has_isect = isinstance(isect, (Polygon, MultiPolygon)) and not isect.is_empty
+                else:
+                    has_isect = True   # we don't need an intersection on second pass -- handle isolated features
+
+                if has_isect:
                     center_to_center = LineString([p.centroid, diff_part.centroid])
                     if not any(center_to_center.crosses(region_polys[i_neighb]) for i_neighb in neighbor_regions):
                         add.append(diff_part)
