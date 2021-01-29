@@ -79,7 +79,7 @@ def test_get_points_to_poly_assignments_hypothesis(available_points, n_poly):
 
 
 @settings(deadline=10000)
-@given(n_pts=st.integers(0, 20),
+@given(n_pts=st.integers(0, 200),
        per_geom=st.booleans(),
        return_unassigned_pts=st.booleans(),
        results_per_geom=st.booleans())
@@ -136,12 +136,10 @@ def test_voronoi_regions_from_coords_italy(n_pts, per_geom, return_unassigned_pt
                     geom_area = area_shape.geoms[i_geom].area
                 else:
                     geom_area = sum(g.area for g in area_shape.geoms)
-                fig, ax = subplot_for_map()
-                plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys_in_geom, coords, region_pts_in_geom)
                 _check_region_polys(region_polys_in_geom.values(), region_pts_in_geom.values(), coords,
                                     expected_sum_area=geom_area)
             else:
-                # no polys generated -> must be insufficient number of points
+                # no polys generated -> must be insufficient number of points in geom
                 pass
     else:   #    not results_per_geom
         assert len(region_polys) <= n_pts
@@ -150,6 +148,19 @@ def test_voronoi_regions_from_coords_italy(n_pts, per_geom, return_unassigned_pt
         if unassigned_pts is not None:
             assert set(range(n_pts)) - set(pts_region.keys()) == unassigned_pts
 
+        assert isinstance(region_polys, dict)
+        assert isinstance(region_pts, dict)
+        assert list(region_polys.keys()) == list(region_pts.keys())
+
+        if region_polys:
+            if per_geom:
+                geom_area = None  # can't determine this here
+            else:
+                geom_area = sum(g.area for g in area_shape.geoms)
+            _check_region_polys(region_polys.values(), region_pts.values(), coords, expected_sum_area=geom_area)
+        else:
+            # no polys generated -> must be insufficient number of points
+            assert n_pts < 4
 
 
 # #%% realistic full tests with plotting
@@ -381,4 +392,5 @@ def _check_region_polys(region_polys, region_pts, coords, expected_sum_area, con
 
         sum_area += poly.area
 
-    assert np.isclose(sum_area, expected_sum_area)
+    if expected_sum_area is not None:
+        assert np.isclose(sum_area, expected_sum_area)
