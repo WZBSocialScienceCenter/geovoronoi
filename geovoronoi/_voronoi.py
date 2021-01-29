@@ -32,7 +32,8 @@ def points_to_coords(pts):
     return np.array([p.coords[0] for p in pts])
 
 
-def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassigned_points=False):
+def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassigned_points=False,
+                                results_per_geom=False):
     """
     Calculate Voronoi regions from NumPy array of 2D coordinates `coord` that lie within a shape `geo_shape`. Setting
     `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully cover `geo_shape`. Set this
@@ -59,6 +60,9 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
 
     logger.info('running Voronoi tesselation for %d points / treating geoms separately: %s' % (len(coords), per_geom))
 
+    if len(coords) < 2:
+        raise ValueError('insufficient number of points provided in `coords`')
+
     if isinstance(coords, np.ndarray):
         pts = coords_to_points(coords)
     else:
@@ -78,12 +82,18 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
         geoms = geo_shape.geoms
 
     pts_indices = set(range(len(pts)))
-    region_polys = {}
-    region_pts = {}
+    geom_region_polys = {}
+    geom_region_pts = {}
     unassigned_pts = set()
+
     for i_geom, geom in enumerate(geoms):
         pts_in_geom = [i for i in pts_indices if geom.contains(pts[i])]
+
+        geom_region_polys[i_geom] = {}
+        geom_region_pts[i_geom] = {}
+
         logger.info('%d of %d points in geometry #%d of %d' % (len(pts_in_geom), len(pts), i_geom + 1, len(geoms)))
+
         if not pts_in_geom:
             continue
 
@@ -103,15 +113,29 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
         logger.info('generating Voronoi region polygons')
         geom_polys, geom_pts = region_polygons_from_voronoi(vor, geom, return_point_assignments=True)
 
-        region_ids = range(len(region_polys), len(region_polys) + len(geom_polys))
-        region_ids_mapping = dict(zip(region_ids, geom_polys.keys()))
-        region_polys.update(dict(zip(region_ids, geom_polys.values())))
+        # map back to original point indices
+        pts_in_geom_arr = np.asarray(pts_in_geom)
+        for i_reg, pt_indices in geom_pts.items():
+            geom_pts[i_reg] = pts_in_geom_arr[pt_indices].tolist()
 
-        pt_ids_mapping = dict(zip(range(len(pts_in_geom)), pts_in_geom))
-        region_pts.update(
-            {reg_id: [pt_ids_mapping[pt_id] for pt_id in geom_pts[old_reg_id]]
-                     for reg_id, old_reg_id in region_ids_mapping.items()}
-        )
+        geom_region_polys[i_geom] = geom_polys
+        geom_region_pts[i_geom] = geom_pts
+
+    if results_per_geom:
+        region_polys = geom_region_polys
+        region_pts = geom_region_pts
+    else:
+        region_polys = {}
+        region_pts = {}
+
+        for i_geom, geom_polys in geom_region_polys.items():
+            geom_pts = geom_region_pts[i_geom]
+
+            region_ids = range(len(region_polys), len(region_polys) + len(geom_polys))
+            region_ids_mapping = dict(zip(region_ids, geom_polys.keys()))
+            region_polys.update(dict(zip(region_ids, geom_polys.values())))
+
+            region_pts.update({reg_id: geom_pts[old_reg_id] for reg_id, old_reg_id in region_ids_mapping.items()})
 
     if return_unassigned_points:
         return region_polys, region_pts, unassigned_pts
