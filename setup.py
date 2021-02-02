@@ -14,7 +14,7 @@ __license__ = 'Apache License 2.0'
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-DEPS_BASE = ['numpy>=1.19.0,<2', 'scipy>=1.6.0,<1.7', 'shapely>=1.7.0,<1.8']
+DEPS_BASE = ['numpy>=1.19.0,<2', 'scipy>=1.5.0,<1.7', 'shapely>=1.7.0,<1.8']
 
 DEPS_EXTRA = {
     'plotting': ['matplotlib>=3.3.0,<3.4', 'geopandas>=0.8.0,<0.9', 'descartes>=1.1.0,<1.2'],
