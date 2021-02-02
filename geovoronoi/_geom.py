@@ -1,6 +1,8 @@
 """
 Geometry helper functions in cartesian 2D space.
 
+"Shapely" refers to the [Shapely Python package for computational geometry](http://toblerity.org/shapely/index.html).
+
 Author: Markus Konrad <markus.konrad@wzb.eu>
 """
 
@@ -69,14 +71,22 @@ def line_segment_intersection(l_off, l_dir, segm_a, segm_b):
             return None
 
 
-def calculate_polygon_areas(poly_shapes, m2_to_km2=False):
+def calculate_polygon_areas(region_polys, m2_to_km2=False):
     """
-    Return the area of the respective polygons in `poly_shapes`. Returns a NumPy array of areas in m² (if `m2_to_km2` is
-    False) or km² (otherwise).
+    Return the area of the respective polygons in `poly_shapes` either in unit square meters (`m2_to_km2` is False) or
+    in square kilometers (`m2_to_km2` is True). Does not really calculate the area but uses the `area` property of
+    the Shapely polygons.
+
+    Note: It is important to use an *equal area* projection with meters as units before using the areas of the
+          Voronoi regions!
+
+    :param region_polys: dict mapping Voronoi region IDs to Shapely Polygon/MultiPolygon objects
+    :param m2_to_km2: if True, return results as square kilometers, otherwise square meters
+    :return: dict mapping Voronoi region IDs to area in square meters or square kilometers
     """
 
-    if not isinstance(poly_shapes, dict):
+    if not isinstance(region_polys, dict):
         raise ValueError('`poly_shapes` must be a dict')
 
     unit_convert = 1000000 if m2_to_km2 else 1
-    return {i_poly: p.area / unit_convert for i_poly, p in poly_shapes.items()}
+    return {i_poly: p.area / unit_convert for i_poly, p in region_polys.items()}

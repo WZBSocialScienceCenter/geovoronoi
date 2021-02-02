@@ -1,7 +1,7 @@
 """
 Functions to create Voronoi regions from points inside a geographic area.
 
-"shapely" refers to the [Shapely Python package for computational geometry](http://toblerity.org/shapely/index.html).
+"Shapely" refers to the [Shapely Python package for computational geometry](http://toblerity.org/shapely/index.html).
 
 Author: Markus Konrad <markus.konrad@wzb.eu>
 """
@@ -24,39 +24,111 @@ logger.addHandler(logging.NullHandler())
 
 
 def coords_to_points(coords):
-    """Convert a NumPy array of 2D coordinates `coords` to a list of shapely Point objects"""
+    """
+    Convert a NumPy array of 2D coordinates `coords` to a list of Shapely Point objects.
+
+    This is the inverse of `points_to_coords()`.
+
+    :param coords: NumPy array of shape (N,2) with N coordinates in 2D space
+    :return: list of length N with Shapely Point objects
+    """
     return list(map(asPoint, coords))
 
 
 def points_to_coords(pts):
-    """Convert a list of shapely Point objects to a NumPy array of 2D coordinates `coords`"""
+    """
+    Convert a list of Shapely Point objects to a NumPy array of 2D coordinates `coords`.
+
+    This is the inverse of `coords_to_points()`.
+
+    :param pts: list of length N with Shapely Point objects
+    :return: NumPy array of shape (N,2) with N coordinates in 2D space
+    """
     return np.array([p.coords[0] for p in pts])
 
 
 def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassigned_points=False,
                                 results_per_geom=False, **kwargs):
     """
-    Calculate Voronoi regions from NumPy array of 2D coordinates `coord` that lie within a shape `geo_shape`. Setting
-    `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully cover `geo_shape`. Set this
-    to a small number that indicates the minimum valid area of "fill up" Voronoi region shapes.
-    Set `accept_n_coord_duplicates` to accept exactly this number of points with exactly the same coordinates. Such
-    duplicates will belong to the same Voronoi region. If set to `None` then any number of duplicate coordinates is
-    accepted. Set `return_unassigned_points` to True to additionally return a list of shapely Point objects that could
-    not be assigned to any Voronoi region.
+    Generate Voronoi regions from NumPy array of 2D coordinates or list of Shapely Point objects in `coord`. These
+    points must lie within a shape `geo_shape` which must be a valid Shapely Polygon or MultiPolygon object. If
+    `geo_shape` is a MultiPolygon, each of its sub-geometries will be either treated separately during Voronoi
+    region generation when `per_geom` is True or otherwise the whole MultiPolygon is treated as one object. In the
+    former case, Voronoi regions may not span from one sub-geometry to another (e.g. from one island to another
+    island) which also means that sub-geometries may remain empty (e.g. when there are no points on an island). In the
+    latter case Voronoi regions from one sub-geometry may span to another sub-geometry, hence all sub-geometries
+    should be covered by a Voronoi region as a result.
 
-    This function returns the following values in a tuple:
+    This function returns at least two dicts in a tuple, called `region_polys` and `region_pts`. The first contains a
+    dict that maps unique Voronoi region IDs to the generated Voronoi region geometries as Shapely Polygon/MultiPolygon
+    objects. The second contains a dict that maps the region IDs to a list of point indices of `coords`. This dict
+    describes which Voronoi region contains which points. By definition a Voronoi region surrounds only a single point.
+    However, if you have duplicate coordinates in `coords`, these duplicate points will be surrounded by the same
+    Voronoi region.
 
-    1. `poly_shapes`: a list of shapely Polygon/MultiPolygon objects that represent the generated Voronoi regions
-    2. `points`: the input coordinates converted to a list of shapely Point objects
-    3. `poly_to_pt_assignments`: a nested list that for each Voronoi region in `poly_shapes` contains a list of indices
-       into `points` (or `coords`) that represent the points that belong to this Voronoi region. Usually, this is only
-       a single point. However, in case of duplicate points (e.g. both or more points have exactly the same coordinates)
-       then all these duplicate points are listed for the respective Voronoi region.
-    4. optional if `return_unassigned_points` is True: a list of points that could not be assigned to any Voronoi region
+    The structure of the returned dicts depends on `results_per_geom`. If `results_per_geom` is False, there is a direct
+    mapping from Voronoi region ID to region geometry or assigned points respectively. If `results_per_geom` is True,
+    both dicts map a sub-geometry ID from `geo_shape` (the index of the sub-geometry in `geo_shape.geoms`) to the
+    respective dict which in turn map a Voronoi region ID to its region geometry or assigned points.
 
-    When calculating the far points of loose ridges for the Voronoi regions, `farpoints_max_extend_factor` is the
-    factor that is multiplied with the maximum extend per dimension. Increase this number in case the hull of far points
-    doesn't intersect with `geo_shape`.
+    To conclude with N coordinates in `coords` and `results_per_geom` is False (default):
+
+    ```
+    region_polys =
+    {
+        0: <Shapely Polygon/MultiPolygon>,
+        1: <Shapely Polygon/MultiPolygon>,
+        ...
+        N-1: <Shapely Polygon/MultiPolygon>
+    }
+    region_pts =
+    {
+        0: [5],
+        1: [7, 2],   # coords[7] and coords[2] are duplicates
+        ...
+        N-1: [3]
+    }
+    ```
+
+    And if `results_per_geom` is True and there are M sub-geometries in `geo_shape`:
+
+    ```
+    region_polys =
+    {
+        0: {   # first sub-geometry in `geom_shape` with Voronoi regions inside
+            4: <Shapely Polygon/MultiPolygon>,
+            2: <Shapely Polygon/MultiPolygon>,
+            ...
+        },
+        ...
+        M-1: { # last sub-geometry in `geom_shape` with Voronoi regions inside
+            9: <Shapely Polygon/MultiPolygon>,
+            12: <Shapely Polygon/MultiPolygon>,
+            ...
+        },
+    }
+
+    region_pts = (similar to above)
+    ```
+
+    Setting `results_per_geom` to True only makes sense when `per_geom` is True so that Voronoi region generation is
+    done separately for each sub-geometry in `geo_shape`.
+
+    :param coords: NumPy array of 2D coordinates as shape (N,2) for N points or list of Shapely Point objects; should
+                   contain at least two points
+    :param geo_shape: Shapely Polygon or MultiPolygon object that defines the restricting area of the Voronoi regions;
+                      all points in `coords` should be within `geo_shape`; make sure that `geo_shape` is a valid
+                      geometry
+    :param per_geom: if True, treat sub-geometries in `geo_shape` separately during Voronoi region generation
+    :param return_unassigned_points: If True, additionally return set of point indices which could not be assigned to
+                                     any Voronoi region (usually because there were too few points inside a sub-geometry
+                                     to generate Voronoi regions)
+    :param results_per_geom: partition the result dicts by sub-geometry index
+    :param kwargs: parameters passed to `region_polygons_from_voronoi()`
+    :return tuple of length two if return_unassigned_points is False, otherwise of length three with: (1) dict
+            containing generated Voronoi region geometries as Shapely Polygon/MultiPolygon, (2) dict mapping Voronoi
+            regions to point indices of `coords`, (3 - optionally) set of point indices which could not be assigned to
+            any Voronoi region
     """
 
     logger.info('running Voronoi tesselation for %d points / treating geoms separately: %s' % (len(coords), per_geom))
