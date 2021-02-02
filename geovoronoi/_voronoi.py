@@ -34,7 +34,7 @@ def points_to_coords(pts):
 
 
 def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassigned_points=False,
-                                results_per_geom=False):
+                                results_per_geom=False, **kwargs):
     """
     Calculate Voronoi regions from NumPy array of 2D coordinates `coord` that lie within a shape `geo_shape`. Setting
     `shapes_from_diff_with_min_area` fixes rare errors where the Voronoi shapes do not fully cover `geo_shape`. Set this
@@ -112,7 +112,7 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
             raise exc
 
         logger.info('generating Voronoi region polygons')
-        geom_polys, geom_pts = region_polygons_from_voronoi(vor, geom, return_point_assignments=True)
+        geom_polys, geom_pts = region_polygons_from_voronoi(vor, geom, return_point_assignments=True, **kwargs)
 
         # map back to original point indices
         pts_in_geom_arr = np.asarray(pts_in_geom)
@@ -121,6 +121,8 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
 
         geom_region_polys[i_geom] = geom_polys
         geom_region_pts[i_geom] = geom_pts
+
+    logger.info('collecting Voronoi region results')
 
     if results_per_geom:
         region_polys = geom_region_polys
@@ -144,8 +146,11 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
         return region_polys, region_pts
 
 
-def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
-    bounds_buf = max(geom.bounds[2] - geom.bounds[0], geom.bounds[3] - geom.bounds[1]) * 0.1
+def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
+                                 bounds_buf_factor=0.1,
+                                 diff_topo_error_buf_factor=0.00000001):
+    max_extend = max(geom.bounds[2] - geom.bounds[0], geom.bounds[3] - geom.bounds[1])
+    bounds_buf = max_extend * bounds_buf_factor
     geom_bb = box(*geom.bounds).buffer(bounds_buf)
     center = np.array(MultiPoint(vor.points).convex_hull.centroid)
     ridge_vert = np.array(vor.ridge_vertices)
@@ -261,7 +266,12 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
         try:
             diff = geom.difference(union_other_regions)
         except TopologicalError:   # may happen in rare circumstances
-            continue
+            try:
+                diff = geom.buffer(max_extend * diff_topo_error_buf_factor).difference(union_other_regions)
+            except TopologicalError:
+                raise RuntimeError('difference operation failed with TopologicalError; try setting a different '
+                                   '`diff_topo_error_buf_factor`')
+
         if isinstance(diff, MultiPolygon):
             diff = diff.geoms
         else:
@@ -284,7 +294,7 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
                         if pass_ == 1:
                             covered_area += (diff_part.area - p.area)
                         else:
-                            covered_area = diff_part.area
+                            covered_area += diff_part.area
 
         if add:
             region_polys[i_reg] = cascaded_union([p] + add)
