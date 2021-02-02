@@ -13,8 +13,6 @@ from geovoronoi import (
 )
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
-np.random.seed(123)
-
 
 #%% tests for individual functions
 
@@ -85,11 +83,12 @@ def test_get_points_to_poly_assignments_hypothesis(available_points, n_poly):
        results_per_geom=st.booleans())
 def test_voronoi_regions_from_coords_italy(n_pts, per_geom, return_unassigned_pts, results_per_geom):
     area_shape = _get_country_shape('Italy')
-    n_geoms = len(area_shape.geoms)
+    n_geoms = len(area_shape.geoms)     # number of geometries (is 3 -- main land Italy plus Sardinia and Sicilia)
+    # put random coordinates inside shape
     coords = _rand_coords_in_shape(area_shape, n_pts)
     n_pts = len(coords)   # number of random points inside shape
 
-    if n_pts < 2:
+    if n_pts < 2:  # check ValueError when less than 2 points are submitted
         with pytest.raises(ValueError):
             voronoi_regions_from_coords(coords, area_shape,
                                         per_geom=per_geom,
@@ -98,14 +97,16 @@ def test_voronoi_regions_from_coords_italy(n_pts, per_geom, return_unassigned_pt
 
         return
 
+    # generate Voronoi region polygons
     res = voronoi_regions_from_coords(coords, area_shape,
                                       per_geom=per_geom,
                                       return_unassigned_points=return_unassigned_pts,
                                       results_per_geom=results_per_geom)
 
+    # in any case, this must return a tuple of results
     assert isinstance(res, tuple)
 
-    if return_unassigned_pts:
+    if return_unassigned_pts:   # additionally expect set of unassigned points
         assert len(res) == 3
         region_polys, region_pts, unassigned_pts = res
         assert isinstance(unassigned_pts, set)
@@ -115,22 +116,28 @@ def test_voronoi_regions_from_coords_italy(n_pts, per_geom, return_unassigned_pt
         region_polys, region_pts = res
         unassigned_pts = None
 
+    # check general result structure
     assert isinstance(region_polys, dict)
     assert isinstance(region_pts, dict)
     assert list(region_polys.keys()) == list(region_pts.keys())
 
-    if results_per_geom:
-        if not per_geom:
+    if results_per_geom:    # expect a dict that maps geom ID to results
+        if not per_geom:    # if geoms are not treated separately, there's only one geom ID
             assert list(region_polys.keys()) == list(region_pts.keys()) == [0]
 
+        # iterate through geoms
         for i_geom in region_polys.keys():
+            # get Voronoi polygons
             assert 0 <= i_geom < n_geoms
             region_polys_in_geom = region_polys[i_geom]
             assert isinstance(region_polys_in_geom, dict)
+
+            # get Voronoi region -> points assignments
             region_pts_in_geom = region_pts[i_geom]
             assert isinstance(region_pts_in_geom, dict)
             assert list(region_polys_in_geom.keys()) == list(region_pts_in_geom.keys())
 
+            # check region polygons
             if region_pts_in_geom:
                 if per_geom:
                     geom_area = area_shape.geoms[i_geom].area
@@ -141,17 +148,22 @@ def test_voronoi_regions_from_coords_italy(n_pts, per_geom, return_unassigned_pt
             else:
                 # no polys generated -> must be insufficient number of points in geom
                 pass
-    else:   #    not results_per_geom
+    else:   # not results_per_geom
+        # results are *not* given per geom ID
         assert len(region_polys) <= n_pts
         assert len(region_pts) == len(region_polys)
+
+        # points to region assignments
         pts_region = get_points_to_poly_assignments(region_pts)
-        if unassigned_pts is not None:
+        if unassigned_pts is not None:   # check that unassigned points are not in the result set
             assert set(range(n_pts)) - set(pts_region.keys()) == unassigned_pts
 
+        # check result structure
         assert isinstance(region_polys, dict)
         assert isinstance(region_pts, dict)
         assert list(region_polys.keys()) == list(region_pts.keys())
 
+        # check region polygons
         if region_polys:
             if per_geom:
                 geom_area = None  # can't determine this here
@@ -162,200 +174,194 @@ def test_voronoi_regions_from_coords_italy(n_pts, per_geom, return_unassigned_pt
             # no polys generated -> must be insufficient number of points
             assert n_pts < 4
 
+    # fig, ax = subplot_for_map(show_x_axis=True, show_y_axis=True)
+    # plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, coords, region_pts,
+    #                                        point_labels=list(map(str, range(len(coords)))),
+    #                                        voronoi_labels=list(map(str, region_polys.keys())))
+    # fig.show()
+
 
 # #%% realistic full tests with plotting
-#
-#
-# @pytest.mark.parametrize(
-#     'n_pts', [5, 10, 20, 50, 100, 105, 1000]
-# )
-# @pytest.mark.mpl_image_compare
-# def test_voronoi_italy_with_plot(n_pts):
-#     area_shape = _get_country_shape('Italy')
-#     coords = _rand_coords_in_shape(area_shape, n_pts)
-#     poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
-#
-#     assert isinstance(poly_shapes, list)
-#     assert 0 < len(poly_shapes) <= 100
-#     assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
-#
-#     assert np.array_equal(points_to_coords(pts), coords)
-#
-#     assert isinstance(poly_to_pt_assignments, list)
-#     assert len(poly_to_pt_assignments) == len(poly_shapes)
-#     assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
-#     assert all([len(assign) == 1 for assign in poly_to_pt_assignments])   # in this case there is a 1:1 correspondance
-#
-#     fig, ax = subplot_for_map()
-#     plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords, poly_to_pt_assignments)
-#
-#     return fig
-#
-#
-# @pytest.mark.mpl_image_compare
-# def test_voronoi_spain_area_with_plot():
-#     area_shape = _get_country_shape('Spain')
-#     coords = _rand_coords_in_shape(area_shape, 20)
-#     poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
-#
-#     assert isinstance(poly_shapes, list)
-#     assert 0 < len(poly_shapes) <= 20
-#     assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
-#
-#     assert np.array_equal(points_to_coords(pts), coords)
-#
-#     assert isinstance(poly_to_pt_assignments, list)
-#     assert len(poly_to_pt_assignments) == len(poly_shapes)
-#     assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
-#     assert all([len(assign) == 1 for assign in poly_to_pt_assignments])   # in this case there is a 1:1 correspondance
-#
-#     poly_areas = calculate_polygon_areas(poly_shapes, m2_to_km2=True)  # converts m² to km²
-#     assert isinstance(poly_areas, np.ndarray)
-#     assert np.issubdtype(poly_areas.dtype, np.float_)
-#     assert len(poly_areas) == len(poly_shapes)
-#     assert np.all(poly_areas > 0)
-#
-#     fig, ax = subplot_for_map(show_x_axis=True, show_y_axis=True)
-#
-#     voronoi_labels = ['%d km²' % round(a) for a in poly_areas]
-#     plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords, poly_to_pt_assignments,
-#                                            voronoi_labels=voronoi_labels, voronoi_label_fontsize=7,
-#                                            voronoi_label_color='gray')
-#
-#     return fig
-#
-#
-# @pytest.mark.mpl_image_compare
-# def test_voronoi_geopandas_with_plot():
-#     world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
-#     cities = gpd.read_file(gpd.datasets.get_path('naturalearth_cities'))
-#
-#     # focus on South America, convert to World Mercator (unit: meters)
-#     south_am = world[world.continent == 'South America'].to_crs(epsg=3395)
-#     cities = cities.to_crs(south_am.crs)  # convert city coordinates to same CRS!
-#
-#     # create the bounding shape as union of all South American countries' shapes
-#     south_am_shape = cascaded_union(south_am.geometry)
-#     south_am_cities = cities[cities.geometry.within(south_am_shape)]  # reduce to cities in South America
-#
-#     # convert the pandas Series of Point objects to NumPy array of coordinates
-#     coords = points_to_coords(south_am_cities.geometry)
-#
-#     # calculate the regions
-#     poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, south_am_shape)
-#
-#     assert isinstance(poly_shapes, list)
-#     assert 0 < len(poly_shapes) <= len(coords)
-#     assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
-#
-#     assert np.array_equal(points_to_coords(pts), coords)
-#
-#     assert isinstance(poly_to_pt_assignments, list)
-#     assert len(poly_to_pt_assignments) == len(poly_shapes)
-#     assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
-#     assert all([len(assign) == 1 for assign in poly_to_pt_assignments])   # in this case there is a 1:1 correspondance
-#
-#     fig, ax = subplot_for_map()
-#
-#     plot_voronoi_polys_with_points_in_area(ax, south_am_shape, poly_shapes, pts, poly_to_pt_assignments)
-#
-#     return fig
-#
-#
-# @pytest.mark.mpl_image_compare
-# def test_voronoi_sweden_duplicate_points_with_plot():
-#     area_shape = _get_country_shape('Sweden')
-#     coords = _rand_coords_in_shape(area_shape, 20)
-#
-#     # duplicate a few points
-#     rand_dupl_ind = np.random.randint(len(coords), size=10)
-#     coords = np.concatenate((coords, coords[rand_dupl_ind]))
-#
-#     poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape,
-#                                                                            accept_n_coord_duplicates=10)
-#
-#     assert isinstance(poly_shapes, list)
-#     assert 0 < len(poly_shapes) <= 20
-#     assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
-#
-#     assert np.array_equal(points_to_coords(pts), coords)
-#
-#     assert isinstance(poly_to_pt_assignments, list)
-#     assert len(poly_to_pt_assignments) == len(poly_shapes)
-#     assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
-#     assert all([0 < len(assign) <= 10 for assign in poly_to_pt_assignments])   # in this case there is not
-#                                                                                # everywhere a 1:1 correspondance
-#
-#     pts_to_poly_assignments = np.array(get_points_to_poly_assignments(poly_to_pt_assignments))
-#
-#     # make point labels: counts of duplicates per points
-#     count_per_pt = [sum(pts_to_poly_assignments == i_poly) for i_poly in pts_to_poly_assignments]
-#     pt_labels = list(map(str, count_per_pt))
-#
-#     # highlight voronoi regions with point duplicates
-#     count_per_poly = np.array(list(map(len, poly_to_pt_assignments)))
-#     vor_colors = np.repeat('blue', len(poly_shapes))   # default color
-#     vor_colors[count_per_poly > 1] = 'red'             # hightlight color
-#
-#     fig, ax = subplot_for_map()
-#
-#     plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords,
-#                                            plot_voronoi_opts={'alpha': 0.2},
-#                                            plot_points_opts={'alpha': 0.4},
-#                                            voronoi_color=list(vor_colors),
-#                                            point_labels=pt_labels,
-#                                            points_markersize=np.array(count_per_pt)*10)
-#
-#     return fig
-#
-#
-# #%% tests against fixed issues
-#
-# def test_issue_7a():
-#     centroids = np.array([[537300, 213400], [538700, 213700], [536100, 213400]])
-#     polygon = Polygon([[540000, 214100], [535500, 213700], [535500, 213000], [539000, 213200]])
-#     poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(centroids, polygon)
-#
-#     assert isinstance(poly_shapes, list)
-#     assert 0 < len(poly_shapes) <= len(centroids)
-#     assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
-#
-#     assert np.array_equal(points_to_coords(pts), centroids)
-#
-#     assert isinstance(poly_to_pt_assignments, list)
-#     assert len(poly_to_pt_assignments) == len(poly_shapes)
-#     assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
-#     assert all([len(assign) == 1 for assign in poly_to_pt_assignments])   # in this case there is a 1:1 correspondance
-#
-#
-# @pytest.mark.mpl_image_compare
-# def test_issue_7b():
-#     centroids = np.array([[496712, 232672], [497987, 235942], [496425, 230252], [497482, 234933],
-#                           [499331, 238351], [496081, 231033], [497090, 233846], [496755, 231645],
-#                           [498604, 237018]])
-#     polygon = Polygon([[495555, 230875], [496938, 235438], [499405, 239403], [499676, 239474],
-#                        [499733, 237877], [498863, 237792], [499120, 237335], [498321, 235010],
-#                        [497295, 233185], [497237, 231359], [496696, 229620], [495982, 230047],
-#                        [496154, 230347], [496154, 230347], [495555, 230875]])
-#
-#     poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(centroids, polygon)
-#
-#     assert isinstance(poly_shapes, list)
-#     assert 0 < len(poly_shapes) <= len(centroids)
-#     assert all([isinstance(p, (Polygon, MultiPolygon)) for p in poly_shapes])
-#
-#     assert np.array_equal(points_to_coords(pts), centroids)
-#
-#     assert isinstance(poly_to_pt_assignments, list)
-#     assert len(poly_to_pt_assignments) == len(poly_shapes)
-#     assert all([isinstance(assign, list) for assign in poly_to_pt_assignments])
-#     assert all([len(assign) == 1 for assign in poly_to_pt_assignments])   # in this case there is a 1:1 correspondance
-#
-#     fig, ax = subplot_for_map()
-#     plot_voronoi_polys_with_points_in_area(ax, polygon, poly_shapes, centroids, poly_to_pt_assignments)
-#
-#     return fig
-#
+
+
+@pytest.mark.parametrize(
+    'n_pts,per_geom', [
+        (10, True), (10, False),
+        (20, True), (20, False),
+        (50, True), (50, False),
+        (100, True), (100, False),
+        (500, True), (500, False),
+        (1000, True), (1000, False),
+    ]
+)
+@pytest.mark.mpl_image_compare
+def test_voronoi_italy_with_plot(n_pts, per_geom):
+    area_shape = _get_country_shape('Italy')
+    coords = _rand_coords_in_shape(area_shape, n_pts)
+
+    # generate Voronoi regions
+    region_polys, region_pts = voronoi_regions_from_coords(coords, area_shape, per_geom=per_geom)
+
+    # full checks for voronoi_regions_from_coords() are done in test_voronoi_regions_from_coords_italy()
+
+    assert isinstance(region_polys, dict)
+    assert isinstance(region_pts, dict)
+    assert len(region_polys) == len(region_pts)
+    assert 0 < len(region_polys) <= n_pts
+
+    # generate plot
+    fig, ax = subplot_for_map()
+    plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, coords, region_pts,
+                                           point_labels=list(map(str, range(len(coords)))))
+
+    return fig
+
+
+@pytest.mark.mpl_image_compare
+def test_voronoi_spain_area_with_plot():
+    area_shape = _get_country_shape('Spain')
+    coords = _rand_coords_in_shape(area_shape, 20)
+
+    # generate Voronoi regions
+    region_polys, region_pts = voronoi_regions_from_coords(coords, area_shape)
+
+    # full checks for voronoi_regions_from_coords() are done in test_voronoi_regions_from_coords_italy()
+
+    assert isinstance(region_polys, dict)
+    assert isinstance(region_pts, dict)
+    assert len(region_polys) == len(region_pts)
+    assert 0 < len(region_polys) <= 20
+
+    # generate covered area
+    region_areas = calculate_polygon_areas(region_polys, m2_to_km2=True)  # converts m² to km²
+    assert isinstance(region_areas, dict)
+    assert set(region_areas.keys()) == set(region_polys.keys())
+
+    # generate plot
+    fig, ax = subplot_for_map(show_x_axis=True, show_y_axis=True)
+    voronoi_labels = {k: '%d km²' % round(a) for k, a in region_areas.items()}
+    plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, coords, region_pts,
+                                           voronoi_labels=voronoi_labels, voronoi_label_fontsize=7,
+                                           voronoi_label_color='gray')
+
+    return fig
+
+
+@pytest.mark.mpl_image_compare
+def test_voronoi_geopandas_with_plot():
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+    cities = gpd.read_file(gpd.datasets.get_path('naturalearth_cities'))
+
+    # focus on South America, convert to World Mercator (unit: meters)
+    south_am = world[world.continent == 'South America'].to_crs(epsg=3395)
+    cities = cities.to_crs(south_am.crs)  # convert city coordinates to same CRS!
+
+    # create the bounding shape as union of all South American countries' shapes
+    south_am_shape = cascaded_union(south_am.geometry)
+    south_am_cities = cities[cities.geometry.within(south_am_shape)]  # reduce to cities in South America
+
+    # convert the pandas Series of Point objects to NumPy array of coordinates
+    coords = points_to_coords(south_am_cities.geometry)
+
+    # calculate the regions
+    region_polys, region_pts = voronoi_regions_from_coords(coords, south_am_shape, per_geom=False)
+
+    # full checks for voronoi_regions_from_coords() are done in test_voronoi_regions_from_coords_italy()
+
+    assert isinstance(region_polys, dict)
+    assert isinstance(region_pts, dict)
+    assert len(region_polys) == len(region_pts) == len(coords)
+
+    # generate plot
+    fig, ax = subplot_for_map()
+    plot_voronoi_polys_with_points_in_area(ax, south_am_shape, region_polys, coords, region_pts)
+
+    return fig
+
+
+@pytest.mark.mpl_image_compare
+def test_voronoi_sweden_duplicate_points_with_plot():
+    area_shape = _get_country_shape('Sweden')
+    coords = _rand_coords_in_shape(area_shape, 20)
+
+    # duplicate a few points
+    rand_dupl_ind = np.random.randint(len(coords), size=10)
+    coords = np.concatenate((coords, coords[rand_dupl_ind]))
+    n_pts = len(coords)
+
+    # generate Voronoi regions
+    region_polys, region_pts = voronoi_regions_from_coords(coords, area_shape)
+
+    # full checks for voronoi_regions_from_coords() are done in test_voronoi_regions_from_coords_italy()
+
+    assert isinstance(region_polys, dict)
+    assert isinstance(region_pts, dict)
+    assert 0 < len(region_polys) <= n_pts
+    assert 0 < len(region_pts) <= n_pts
+
+    assert all([0 < len(pts_in_region) <= 10 for pts_in_region in region_pts.values()])
+
+    # make point labels: counts of duplicate assignments per points
+    count_per_pt = {pt_indices[0]: len(pt_indices) for pt_indices in region_pts.values()}
+    pt_labels = list(map(str, count_per_pt.values()))
+    distinct_pt_coords = coords[np.asarray(list(count_per_pt.keys()))]
+
+    # highlight voronoi regions with point duplicates
+    vor_colors = {i_poly: (1, 0, 0) if len(pt_indices) > 1 else (0, 0, 1)
+                  for i_poly, pt_indices in region_pts.items()}
+
+    # generate plot
+    fig, ax = subplot_for_map()
+    plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, distinct_pt_coords,
+                                           plot_voronoi_opts={'alpha': 0.2},
+                                           plot_points_opts={'alpha': 0.4},
+                                           voronoi_color=vor_colors,
+                                           voronoi_edgecolor=(0, 0, 0, 1),
+                                           point_labels=pt_labels,
+                                           points_markersize=np.square(np.array(list(count_per_pt.values()))) * 10)
+
+    return fig
+
+
+#%% tests against fixed issues
+
+def test_issue_7a():
+    centroids = np.array([[537300, 213400], [538700, 213700], [536100, 213400]])
+    n_pts = len(centroids)
+    polygon = Polygon([[540000, 214100], [535500, 213700], [535500, 213000], [539000, 213200]])
+    region_polys, region_pts = voronoi_regions_from_coords(centroids, polygon)
+
+    assert isinstance(region_polys, dict)
+    assert isinstance(region_pts, dict)
+    assert len(region_polys) == len(region_pts) == n_pts
+
+    assert all([len(pts_in_region) == 1 for pts_in_region in region_pts.values()])  # no duplicates
+
+
+@pytest.mark.mpl_image_compare
+def test_issue_7b():
+    centroids = np.array([[496712, 232672], [497987, 235942], [496425, 230252], [497482, 234933],
+                          [499331, 238351], [496081, 231033], [497090, 233846], [496755, 231645],
+                          [498604, 237018]])
+    n_pts = len(centroids)
+    polygon = Polygon([[495555, 230875], [496938, 235438], [499405, 239403], [499676, 239474],
+                       [499733, 237877], [498863, 237792], [499120, 237335], [498321, 235010],
+                       [497295, 233185], [497237, 231359], [496696, 229620], [495982, 230047],
+                       [496154, 230347], [496154, 230347], [495555, 230875]])
+
+    region_polys, region_pts = voronoi_regions_from_coords(centroids, polygon)
+
+    assert isinstance(region_polys, dict)
+    assert isinstance(region_pts, dict)
+    assert len(region_polys) == len(region_pts) == n_pts
+
+    assert all([len(pts_in_region) == 1 for pts_in_region in region_pts.values()])  # no duplicates
+
+    fig, ax = subplot_for_map()
+    plot_voronoi_polys_with_points_in_area(ax, polygon, region_polys, centroids, region_pts)
+
+    return fig
+
 
 #%% a few helper functions
 
@@ -368,6 +374,8 @@ def _get_country_shape(country):
 
 
 def _rand_coords_in_shape(area_shape, n_points):
+    np.random.seed(123)
+
     # generate some random points within the bounds
     minx, miny, maxx, maxy = area_shape.bounds
 
@@ -380,12 +388,17 @@ def _rand_coords_in_shape(area_shape, n_points):
     return points_to_coords(pts)
 
 
-def _check_region_polys(region_polys, region_pts, coords, expected_sum_area, contains_check_tol=1):
+def _check_region_polys(region_polys, region_pts, coords, expected_sum_area,
+                        contains_check_tol=1, area_check_tol=0.01):
+    # check validity of each region's polygon, check that all assigned points are inside this polygon and
+    # check that sum of polygons' area matches `expected_sum_area`
     sum_area = 0
     for poly, pt_indices in zip(region_polys, region_pts):
         assert isinstance(poly, (Polygon, MultiPolygon)) and poly.is_valid and not poly.is_empty
         if contains_check_tol != 0:
             polybuf = poly.buffer(contains_check_tol)
+            if polybuf.is_empty or not polybuf.is_valid:   # this may happen due to buffering
+                polybuf = poly
         else:
             polybuf = poly
         assert all([polybuf.contains(asPoint(coords[i_pt])) for i_pt in pt_indices])
@@ -393,4 +406,4 @@ def _check_region_polys(region_polys, region_pts, coords, expected_sum_area, con
         sum_area += poly.area
 
     if expected_sum_area is not None:
-        assert np.isclose(sum_area, expected_sum_area)
+        assert abs(1 - sum_area / expected_sum_area) <= area_check_tol

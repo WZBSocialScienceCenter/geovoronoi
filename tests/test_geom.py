@@ -38,8 +38,13 @@ def test_line_segment_intersection(l_off, l_dir, segm_a, segm_b, expected):
 
 
 def test_calculate_polygon_areas_empty():
-    areas = calculate_polygon_areas([])
+    areas = calculate_polygon_areas({})
     assert len(areas) == 0
+
+
+def test_calculate_polygon_areas_nondict():
+    with pytest.raises(ValueError):
+        calculate_polygon_areas([])
 
 
 def test_calculate_polygon_areas_world():
@@ -47,12 +52,15 @@ def test_calculate_polygon_areas_world():
 
     world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
     world = world[world.continent != 'Antarctica'].to_crs(epsg=3395)  # meters as unit!
+    geoms = {i: geom for i, geom in enumerate(world.geometry)}
 
-    areas = calculate_polygon_areas(world.geometry)
+    areas = calculate_polygon_areas(geoms)
 
+    assert isinstance(areas, dict)
     assert len(areas) == len(world)
-    assert all(0 <= a < 9e13 for a in areas)
+    assert all(0 < a < 9e13 for a in areas.values())
 
-    areas_km2 = calculate_polygon_areas(world.geometry, m2_to_km2=True)
+    areas_km2 = calculate_polygon_areas(geoms, m2_to_km2=True)
+    assert isinstance(areas_km2, dict)
     assert len(areas_km2) == len(world)
-    assert all(np.isclose(a_m, a_km * 1e6) for a_m, a_km in zip(areas, areas_km2))
+    assert all(np.isclose(a_m, a_km * 1e6) for a_m, a_km in zip(areas.values(), areas_km2.values()))

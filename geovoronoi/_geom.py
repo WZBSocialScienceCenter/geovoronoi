@@ -75,5 +75,8 @@ def calculate_polygon_areas(poly_shapes, m2_to_km2=False):
     False) or km² (otherwise).
     """
 
+    if not isinstance(poly_shapes, dict):
+        raise ValueError('`poly_shapes` must be a dict')
+
     unit_convert = 1000000 if m2_to_km2 else 1
     return {i_poly: p.area / unit_convert for i_poly, p in poly_shapes.items()}

@@ -13,6 +13,7 @@ import numpy as np
 from scipy.spatial import Voronoi
 from scipy.spatial.qhull import QhullError
 from shapely.geometry import box, LineString, asPoint, MultiPoint, Polygon, MultiPolygon
+from shapely.errors import TopologicalError
 from shapely.ops import cascaded_union
 
 from ._geom import line_segment_intersection
@@ -207,7 +208,8 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
                             closest_isect_idx = np.argmin(np.linalg.norm(midpoint - isects, axis=1))
                             far_pt = isects[closest_isect_idx]
 
-                        if (far_pt - finite_pt)[0] / direction[0] > 0:   # only if in same direction
+                        nonzero_coord = np.nonzero(direction)[0][0]
+                        if (far_pt - finite_pt)[nonzero_coord] / direction[nonzero_coord] > 0:   # only if in same direction
                             p_vert_farpoints.add(tuple(far_pt))
 
             # create the Voronoi region polygon as convex hull of the ridge vertices and far points (Voronoi regions
@@ -241,14 +243,14 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
     uncovered_area_portion = (geom.area - covered_area) / geom.area
     polys_iter = iter(region_polys.items())
     pass_ = 1
-    while not np.isclose(uncovered_area_portion, 0) and uncovered_area_portion > 0:
+    while not np.isclose(uncovered_area_portion, 0) and 0 < uncovered_area_portion <= 1:
         try:
             i_reg, p = next(polys_iter)
         except StopIteration:
             if pass_ == 1:   # restart w/ second pass
                 polys_iter = iter(region_polys.items())
                 i_reg, p = next(polys_iter)
-                pass_ += 2
+                pass_ += 1
             else:
                 break
         logger.debug('will fill up %f%% uncovered area' % (uncovered_area_portion * 100))
@@ -256,7 +258,10 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
         union_other_regions = cascaded_union([other_poly
                                               for i_other, other_poly in region_polys.items()
                                               if i_reg != i_other])
-        diff = geom.difference(union_other_regions)
+        try:
+            diff = geom.difference(union_other_regions)
+        except TopologicalError:   # may happen in rare circumstances
+            continue
         if isinstance(diff, MultiPolygon):
             diff = diff.geoms
         else:
@@ -276,7 +281,10 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False):
                     center_to_center = LineString([p.centroid, diff_part.centroid])
                     if not any(center_to_center.crosses(region_polys[i_neighb]) for i_neighb in neighbor_regions):
                         add.append(diff_part)
-                        covered_area += (diff_part.area - p.area)
+                        if pass_ == 1:
+                            covered_area += (diff_part.area - p.area)
+                        else:
+                            covered_area = diff_part.area
 
         if add:
             region_polys[i_reg] = cascaded_union([p] + add)
