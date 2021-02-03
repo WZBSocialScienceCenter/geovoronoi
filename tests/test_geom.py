@@ -1,3 +1,9 @@
+"""
+Tests for the private _geom module.
+
+Author: Markus Konrad <markus.konrad@wzb.eu>
+"""
+
 import pytest
 import numpy as np
 

@@ -1,3 +1,9 @@
+"""
+Set of utility functions for testing.
+
+Author: Markus Konrad <markus.konrad@wzb.eu>
+"""
+
 from functools import partial
 
 import numpy as np

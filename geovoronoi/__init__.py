@@ -9,7 +9,7 @@ Author: Markus Konrad <markus.konrad@wzb.eu>
 
 
 from ._voronoi import (coords_to_points, points_to_coords, voronoi_regions_from_coords,
-                       get_points_to_poly_assignments)
+                       points_to_region)
 from ._geom import calculate_polygon_areas, line_segment_intersection
 
 

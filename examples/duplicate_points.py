@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import geopandas as gpd
 
-from geovoronoi import coords_to_points, points_to_coords, voronoi_regions_from_coords, get_points_to_poly_assignments
+from geovoronoi import coords_to_points, points_to_coords, voronoi_regions_from_coords, points_to_region
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
 
@@ -82,7 +82,7 @@ for i_poly, pt_indices in poly_to_pt_assignments.items():
     print('> voronoi region', i_poly, '-> points', str(pt_indices))
 
 print('\n\npoints to voronoi region assignments:')
-pts_to_poly_assignments = get_points_to_poly_assignments(poly_to_pt_assignments)
+pts_to_poly_assignments = points_to_region(poly_to_pt_assignments)
 for i_pt, i_poly in pts_to_poly_assignments.items():
     print('> point ', i_pt, '-> voronoi region', i_poly)
 

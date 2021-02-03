@@ -1,3 +1,9 @@
+"""
+Tests for the main module.
+
+Author: Markus Konrad <markus.konrad@wzb.eu>
+"""
+
 import numpy as np
 import geopandas as gpd
 from shapely.geometry import Polygon, MultiPolygon, asPoint
@@ -9,7 +15,7 @@ import hypothesis.strategies as st
 from ._testtools import coords_2d_array
 from geovoronoi import (
     voronoi_regions_from_coords, coords_to_points, points_to_coords, calculate_polygon_areas,
-    get_points_to_poly_assignments
+    points_to_region
 )
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
@@ -35,9 +41,9 @@ def test_coords_to_points_and_points_to_coords(coords):
 def test_get_points_to_poly_assignments(poly_to_pts, expected):
     if expected is None:
         with pytest.raises(ValueError):
-            get_points_to_poly_assignments(poly_to_pts)
+            points_to_region(poly_to_pts)
     else:
-        assert get_points_to_poly_assignments(poly_to_pts) == expected
+        assert points_to_region(poly_to_pts) == expected
 
 
 @given(available_points=st.permutations(list(range(10))), n_poly=st.integers(0, 10))
@@ -64,7 +70,7 @@ def test_get_points_to_poly_assignments_hypothesis(available_points, n_poly):
     if n_poly > 0:
         assert set(sum(list(poly_to_pts.values()), [])) == set(available_points)
 
-    pts_to_poly = get_points_to_poly_assignments(poly_to_pts)
+    pts_to_poly = points_to_region(poly_to_pts)
 
     assert isinstance(pts_to_poly, dict)
 
@@ -154,7 +160,7 @@ def test_voronoi_regions_from_coords_italy(n_pts, per_geom, return_unassigned_pt
         assert len(region_pts) == len(region_polys)
 
         # points to region assignments
-        pts_region = get_points_to_poly_assignments(region_pts)
+        pts_region = points_to_region(region_pts)
         if unassigned_pts is not None:   # check that unassigned points are not in the result set
             assert set(range(n_pts)) - set(pts_region.keys()) == unassigned_pts
 
