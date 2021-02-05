@@ -1,6 +1,6 @@
 # geovoronoi – a package to create and plot Voronoi regions inside geographic areas
 
-Markus Konrad <markus.konrad@wzb.eu>, March 2020
+Markus Konrad <markus.konrad@wzb.eu>, February 2021
 
 ## Overview
 
@@ -24,7 +24,7 @@ pip install -U geovoronoi
 
 ## Usage
 
-You have a geographic area that contains some points for which you want to generate Voronoi regions. This geographic area is a [shapely Polygon/MultiPolygon object](http://toblerity.org/shapely/manual.html#polygons) (that you, for example obtained from a GeoJSON file that you loaded with [GeoPandas](http://geopandas.org/) or [Fiona](http://toblerity.org/fiona/)). The *N* points you have are either in the form of a *N*x2 NumPy array, or a list of shapely Point objects (they can be converted with the functions `coords_to_points` and `points_to_coords`). Both the points and the surrounding geographic area must have the same [CRS (coordinate reference system)](https://en.wikipedia.org/wiki/Spatial_reference_system).
+You have a geographic area that contains some points for which you want to generate Voronoi regions. This geographic area is a [shapely Polygon/MultiPolygon object](http://toblerity.org/shapely/manual.html#polygons) (that you, for example, obtained from a GeoJSON file that you loaded with [GeoPandas](http://geopandas.org/) or [Fiona](http://toblerity.org/fiona/)). The *N* points you have are either in the form of a *N*x2 NumPy array, or a list of shapely Point objects (they can be converted with the functions `coords_to_points` and `points_to_coords`). Both the points and the surrounding geographic area must in the same [CRS (coordinate reference system)](https://en.wikipedia.org/wiki/Spatial_reference_system).
 
 Let's take for example these randomly generated points in Italy (in [World Mercator CRS](https://epsg.io/3395)): 
 
@@ -61,12 +61,12 @@ Now we can calculate the Voronoi regions, cut them with the geographic area shap
 ```python
 from geovoronoi import voronoi_regions_from_coords
 
-poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
+region_polys, region_pts = voronoi_regions_from_coords(coords, area_shape)
 ```
 
-`poly_shapes` is a list of shapely Polygon objects that represent the shape of the respective Voronoi region. With them, you can do everything that the [shapely API](http://toblerity.org/shapely/manual.html#polygons) provides. You can, for example, get each Voronoi region's [area](http://toblerity.org/shapely/manual.html#object.area) (there's also a helper function `calculate_polygon_areas` in *geovoronoi* for that). 
+`region_polys` is a dict that maps Voronoi region IDs to shapely Polygon objects that represent the shape of the respective Voronoi region. With them, you can do everything that the [shapely API](http://toblerity.org/shapely/manual.html#polygons) provides. You can, for example, get each Voronoi region's [area](http://toblerity.org/shapely/manual.html#object.area) (there's also a helper function `calculate_polygon_areas` in *geovoronoi* for that). 
 
-`pts` is list of shapely Point objects converted from `coords` (in the same order). `poly_to_pt_assignments` is a nested list that for each Voronoi region in `poly_shapes` contains a list of indices into `pts` (and hence `coords`) that represent the points that belong to this Voronoi region. Usually, this is only a single point. However, in case of duplicate points (e.g. both or more points have exactly the same coordinates) then all these duplicate points are listed for the respective Voronoi region.
+`region_pts` is a dict that maps the same Voronoi region IDs as in `region_polys` to a list of indices into `coords`, i.e. these indices represent the points that belong to this Voronoi region. Usually, this is only a single point. However, in case of duplicate points (i.e. two or more points have exactly the same coordinates) all duplicate points are listed for the respective Voronoi region.
 
 You can plot the results with the functions from the `plotting` sub-module:
 
@@ -75,15 +75,15 @@ import matplotlib.pyplot as plt
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
 fig, ax = subplot_for_map()
-plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords, poly_to_pt_assignments)
+plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, coords, region_pts)
 plt.show()
 ```
 
-This would be an example output (see "Limitations" below for the issue of the regions in Sardinia):
+This would be an example output:
 
 ![Voronoi regions of random points across Italy](https://raw.githubusercontent.com/WZBSocialScienceCenter/geovoronoi/master/examples/random_points_across_italy.png)
 
-See the full example source code in [examples/random_points_across_italy.py](examples/random_points_across_italy.py). See also the other examples in the [examples/](examples) directory that show how to calculate the area of the Voronoi regions, handle duplicate points or interact with GeoPandas. 
+See the full example source code in [examples/random_points_across_italy.py](examples/random_points_across_italy.py). See also the other examples in the [examples/](examples) directory that show how to calculate the area of the Voronoi regions, handle duplicate points or interact with the GeoPandas or Fiona packages. 
 
 ## Dependencies
 
@@ -96,16 +96,6 @@ See the full example source code in [examples/random_points_across_italy.py](exa
 * geopandas (only necessary for plotting)
 * descartes (only necessary for plotting)
 
-## Limitations
-
-* MultiPolygon shapes of geographic areas are not treated separately when cutting the Voronoi regions (see Sardinia in `random_points_across_italy.py` example)
-
-## TODO
-
-* support of MultiPolygon shapes of geographic areas (see Sardinia in `random_points_across_italy.py` example)
-* support for plotting `area_shape` objects with multiple geometries
-
 ## License
 
 Licensed under [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See `LICENSE.txt` file. 
-

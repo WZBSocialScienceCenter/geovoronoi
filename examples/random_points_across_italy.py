@@ -67,7 +67,7 @@ print('will use %d of %d randomly generated points that are inside geographic ar
 
 region_polys, region_pts, unassigned_pts = voronoi_regions_from_coords(pts, area_shape,
                                                                        return_unassigned_points=True,
-                                                                       per_geom=True)
+                                                                       per_geom=True)  # this is the default
 
 print('Voronoi region to point assignments:')
 pprint(region_pts)

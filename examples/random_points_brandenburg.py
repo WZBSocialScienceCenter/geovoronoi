@@ -1,6 +1,9 @@
 """
-Example script that scatters random points across Brandenburg and generates the Voronoi regions for them.
-The boundary shape of Brandenburg contains a hole (Berlin) and when loaded is regarded as "invalid" shape.
+Example script that scatters random points across Brandenburg and generates the Voronoi regions for them. This example
+shows how to load data from a GeoJSON file, load it with the fiona package and pass it on to geovoronoi.
+
+The boundary shape of Brandenburg contains a hole (Berlin) and when loaded is regarded as "invalid" shape. We will
+handle that.
 
 Author: Markus Konrad <markus.konrad@wzb.eu>
 January 2021
