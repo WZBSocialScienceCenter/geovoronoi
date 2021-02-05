@@ -49,18 +49,14 @@ coords = points_to_coords(south_am_cities.geometry)
 # calculate the regions
 # we set "per_geom=False" so that the whole continent is treated as one area and Voronoi regions
 # span over to Tierra del Fuego
-poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(coords, south_am_shape, per_geom=False)
+region_polys, region_pts = voronoi_regions_from_coords(coords, south_am_shape, per_geom=False)
 
 
-#%%
-
-#
-# Plotting
-#
+#%% Plotting
 
 fig, ax = subplot_for_map()
 
-plot_voronoi_polys_with_points_in_area(ax, south_am_shape, poly_shapes, coords, poly_to_pt_assignments,
+plot_voronoi_polys_with_points_in_area(ax, south_am_shape, region_polys, coords, region_pts,
                                        point_labels=south_am_cities.name.tolist())
 
 ax.set_title('Cities data for South America from GeoPandas\nand Voronoi regions around them')

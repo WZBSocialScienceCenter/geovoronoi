@@ -73,38 +73,34 @@ print('duplicated %d random points -> we have %d coordinates now' % (N_DUPL, len
 # the duplicate coordinates will belong to the same voronoi region
 #
 
-poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape)
+region_polys, region_pts = voronoi_regions_from_coords(coords, area_shape)
 
 # poly_to_pt_assignments is a nested list because a voronoi region might contain several (duplicate) points
 
 print('\n\nvoronoi region to points assignments:')
-for i_poly, pt_indices in poly_to_pt_assignments.items():
+for i_poly, pt_indices in region_pts.items():
     print('> voronoi region', i_poly, '-> points', str(pt_indices))
 
 print('\n\npoints to voronoi region assignments:')
-pts_to_poly_assignments = points_to_region(poly_to_pt_assignments)
+pts_to_poly_assignments = points_to_region(region_pts)
 for i_pt, i_poly in pts_to_poly_assignments.items():
     print('> point ', i_pt, '-> voronoi region', i_poly)
 
 
-#%%
-
-#
-# plotting
-#
+#%% plotting
 
 # make point labels: counts of duplicate assignments per points
-count_per_pt = {pt_indices[0]: len(pt_indices) for pt_indices in poly_to_pt_assignments.values()}
+count_per_pt = {pt_indices[0]: len(pt_indices) for pt_indices in region_pts.values()}
 pt_labels = list(map(str, count_per_pt.values()))
 distinct_pt_coords = coords[np.asarray(list(count_per_pt.keys()))]
 
 # highlight voronoi regions with point duplicates
 vor_colors = {i_poly: (1,0,0) if len(pt_indices) > 1 else (0,0,1)
-              for i_poly, pt_indices in poly_to_pt_assignments.items()}
+              for i_poly, pt_indices in region_pts.items()}
 
 fig, ax = subplot_for_map()
 
-plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, distinct_pt_coords,
+plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, distinct_pt_coords,
                                        plot_voronoi_opts={'alpha': 0.2},
                                        plot_points_opts={'alpha': 0.4},
                                        voronoi_color=vor_colors,

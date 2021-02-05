@@ -66,16 +66,16 @@ print('will use %d of %d randomly generated points that are inside geographic ar
 # calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
 #
 
-poly_shapes, poly_to_pt_assignments = voronoi_regions_from_coords(pts, brandenburg)
+region_polys, region_pts = voronoi_regions_from_coords(pts, brandenburg)
 
 print('Voronoi region to point assignments:')
-pprint(poly_to_pt_assignments)
+pprint(region_pts)
 
 #%% plotting
 
 fig, ax = subplot_for_map()
 
-plot_voronoi_polys_with_points_in_area(ax, brandenburg, poly_shapes, pts, poly_to_pt_assignments,
+plot_voronoi_polys_with_points_in_area(ax, brandenburg, region_polys, pts, region_pts,
                                        point_labels=list(map(str, range(len(pts)))))
 
 ax.set_title('%d random points and their Voronoi regions in Brandenburg' % len(pts))
