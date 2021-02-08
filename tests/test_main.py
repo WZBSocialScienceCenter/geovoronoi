@@ -395,7 +395,7 @@ def _rand_coords_in_shape(area_shape, n_points):
 
 
 def _check_region_polys(region_polys, region_pts, coords, expected_sum_area,
-                        contains_check_tol=1, area_check_tol=0.1):
+                        contains_check_tol=1, area_check_tol=0.01):
     # check validity of each region's polygon, check that all assigned points are inside this polygon and
     # check that sum of polygons' area matches `expected_sum_area`
     sum_area = 0

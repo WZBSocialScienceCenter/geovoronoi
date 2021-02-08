@@ -253,6 +253,11 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
              inside that Voronoi region
     """
 
+    # plotting utilities useful for debugging:
+    # from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
+    # fig, ax = subplot_for_map(figsize=(12, 8))
+    # plotfile_fmt = '/tmp/geovoronoi/debug-%s.png'
+
     # check input arguments
 
     if not isinstance(vor, Voronoi):
@@ -395,6 +400,9 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
 
     logger.debug('filling preliminary polygons to fully cover the surrounding area')
 
+    # plot_voronoi_polys_with_points_in_area(ax, geom, region_polys, vor.points, region_pts)
+    # fig.savefig(plotfile_fmt % 'beforefill')
+
     uncovered_area_portion = (geom.area - covered_area) / geom.area     # initial portion of uncovered area
     polys_iter = iter(region_polys.items())
     # the loop has two passes: in the first pass, only areas are considered that intersect with the preliminary
@@ -412,7 +420,8 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
                 pass_ += 1
             else:     # no more preliminary Voronoi region polygons left after both passes
                 break
-        logger.debug('will fill up %f%% uncovered area' % (uncovered_area_portion * 100))
+        logger.debug('pass %d / region %d: will fill up %f%% uncovered area'
+                     % (pass_, i_reg, uncovered_area_portion * 100))
 
         # generate polygon from all other regions' polygons other then the current region `i_reg`
         union_other_regions = cascaded_union([other_poly
@@ -443,7 +452,8 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
                     # for first pass, we want an intersection between the so far uncovered area and the current
                     # region's polygon, so that the uncovered area is directly connected with the region's polygon
                     isect = p.intersection(diff_part)
-                    has_isect = isinstance(isect, (Polygon, MultiPolygon)) and not isect.is_empty
+                    has_isect = isinstance(isect, (Polygon, MultiPolygon)) and not isect.is_empty \
+                                and not np.isclose(abs(diff_part.area - p.area), 0)
                 else:
                     has_isect = True   # we don't need an intersection on second pass -- handle isolated features
 
@@ -453,14 +463,18 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
                     center_to_center = LineString([p.centroid, diff_part.centroid])
                     if not any(center_to_center.crosses(region_polys[i_neighb]) for i_neighb in neighbor_regions):
                         add.append(diff_part)
-                        if pass_ == 1:
-                            covered_area += (diff_part.area - p.area)
-                        else:
-                            covered_area += diff_part.area
 
         # add new areas as union
         if add:
-            region_polys[i_reg] = cascaded_union([p] + add)
+            old_reg_area = region_polys[i_reg].area
+            new_reg = cascaded_union([p] + add)
+            area_diff = new_reg.area - old_reg_area
+
+            region_polys[i_reg] = new_reg
+            covered_area += area_diff
+
+            # plot_voronoi_polys_with_points_in_area(ax, geom, region_polys, vor.points, region_pts)
+            # fig.savefig(plotfile_fmt % ('fill-' + str(pass_) + '-' + str(i_reg)))
 
         # update the portion of uncovered area
         uncovered_area_portion = (geom.area - covered_area) / geom.area
