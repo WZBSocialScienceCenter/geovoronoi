@@ -291,7 +291,9 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
 
     # --- phase 1: preliminary polygons ---
 
-    covered_area = 0  # keeps track of area so far covered by generated Voronoi polygons
+    covered_area = 0            # keeps track of area so far covered by generated Voronoi polygons
+    border_regions = set()      # keeps track of regions that don't have fully finite bounds, i.e. that are at the edge
+    inner_regions = set()       # keeps track of regions that have fully finite bounds, i.e. "inner" regions
     # iterate through regions; `i_reg` is the region ID, `reg_vert` contains vertex indices of this region into
     # `ridge_vert`
     for i_reg, reg_vert in enumerate(vor.regions):
@@ -304,10 +306,13 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
 
         # construct the theoretical Polygon `p` of this region
         if np.all(np.array(reg_vert) >= 0):  # fully finite-bounded region
+            inner_regions.add(i_reg)
             p = Polygon(vor.vertices[reg_vert])
         else:
             # this region has a least one infinite bound aka "loose ridge"; we go through each ridge and we will need to
             # calculate a finite end ("far point") for loose ridges
+            border_regions.add(i_reg)
+
             p_vert_indices = set()    # collect unique indices of vertices into `ridge_vert`
             p_vert_farpoints = set()  # collect unique calculated finite far points
 
@@ -396,37 +401,50 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
         covered_area += p.area
         region_polys[i_reg] = p
 
-    # --- phase 2: filling preliminary polygons ---
+    # --- phase 2: filling preliminary polygons at the edges ---
 
-    logger.debug('filling preliminary polygons to fully cover the surrounding area')
+    logger.debug('filling %d preliminary polygons to fully cover the surrounding area' % len(border_regions))
 
     # plot_voronoi_polys_with_points_in_area(ax, geom, region_polys, vor.points, region_pts)
     # fig.savefig(plotfile_fmt % 'beforefill')
 
     uncovered_area_portion = (geom.area - covered_area) / geom.area     # initial portion of uncovered area
-    polys_iter = iter(region_polys.items())
+    polys_iter = iter(border_regions)
     # the loop has two passes: in the first pass, only areas are considered that intersect with the preliminary
     # Voronoi region polygon; in the second pass, also areas that don't intersect are considered, i.e. isolated features
     pass_ = 1
     # the loop stops when all area is covered or there are no more preliminary Voronoi region polygons left after both
     # passes
+    inner_regions_poly = None
     while not np.isclose(uncovered_area_portion, 0) and 0 < uncovered_area_portion <= 1:
         try:
-            i_reg, p = next(polys_iter)
+            i_reg = next(polys_iter)
         except StopIteration:
             if pass_ == 1:   # restart w/ second pass
-                polys_iter = iter(region_polys.items())
-                i_reg, p = next(polys_iter)
+                polys_iter = iter(border_regions)
+                i_reg = next(polys_iter)
                 pass_ += 1
             else:     # no more preliminary Voronoi region polygons left after both passes
                 break
         logger.debug('pass %d / region %d: will fill up %f%% uncovered area'
                      % (pass_, i_reg, uncovered_area_portion * 100))
 
-        # generate polygon from all other regions' polygons other then the current region `i_reg`
-        union_other_regions = cascaded_union([other_poly
-                                              for i_other, other_poly in region_polys.items()
-                                              if i_reg != i_other])
+        p = region_polys[i_reg]
+
+        # generate polygon from all inner regions *once* because this stays constant and is re-used in the loop
+        if not inner_regions_poly and inner_regions:
+            if len(inner_regions) == 1:
+                inner_regions_poly = region_polys[next(iter(inner_regions))]
+            else:
+                inner_regions_poly = cascaded_union([region_polys[i_reg] for i_reg in inner_regions])
+
+        # generate polygon from all other regions' polygons other than the current region `i_reg`
+        other_regions_polys = [region_polys[i_other] for i_other in border_regions if i_reg != i_other]
+        if inner_regions_poly:
+            other_regions_polys.append(inner_regions_poly)
+
+        union_other_regions = cascaded_union(other_regions_polys)
+
         # generate difference between geom and other regions' polygons -- what's left is the current region's area
         # plus any so far uncovered area
         try:

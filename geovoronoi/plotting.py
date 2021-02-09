@@ -14,13 +14,16 @@ from geopandas import GeoSeries
 from ._voronoi import points_to_coords, points_to_region
 
 
-def subplot_for_map(show_x_axis=False, show_y_axis=False, aspect='equal', **kwargs):
+def subplot_for_map(show_x_axis=False, show_y_axis=False, show_spines=None, aspect='equal', **kwargs):
     """
     Helper function to generate a matplotlib subplot Axes object suitable for plotting geographic data, i.e. axis
     labels are not shown and aspect ratio is set to 'equal' by default.
 
     :param show_x_axis: show x axis labels
     :param show_y_axis: show y axis labels
+    :param show_spines: controls display of frame around plot; if set to None, this is "auto" mode, meaning
+                        that the frame is removed when `show_x_axis` and `show_y_axis` are both set to False;
+                        if set to True/False, the frame is always shown/removed
     :param aspect: aspect ratio
     :param kwargs: additional parameters passed to `plt.subplots()`
     :return: tuple with (matplotlib Figure, matplotlib Axes)
@@ -30,6 +33,12 @@ def subplot_for_map(show_x_axis=False, show_y_axis=False, aspect='equal', **kwar
 
     ax.get_xaxis().set_visible(show_x_axis)
     ax.get_yaxis().set_visible(show_y_axis)
+
+    if show_spines is None:
+        show_spines = show_x_axis or show_y_axis
+
+    for sp in ax.spines.values():
+        sp.set_visible(show_spines)
 
     if show_x_axis:
         fig.autofmt_xdate()
@@ -155,11 +164,11 @@ def plot_points(ax, points, markersize=1, marker='o', color=None, labels=None, l
     :param label_color:  point labels color
     :param label_draw_duplicates: if False, suppress drawing labels on duplicate coordinates
     :param kwargs: additional parameters passed to matplotlib's `scatter` function
-    :return: None
+    :return: return value from `ax.scatter()`
     """
     x, y = xy_from_points(points)
 
-    ax.scatter(x, y, s=markersize, marker=marker, color=color, **kwargs)
+    scat = ax.scatter(x, y, s=markersize, marker=marker, color=color, **kwargs)
 
     if labels:
         # plot labels using matplotlib's text()
@@ -176,6 +185,8 @@ def plot_points(ax, points, markersize=1, marker='o', color=None, labels=None, l
                 ax.text(x_i, y_i, labels[i], fontsize=label_fontsize, color=_color_for_labels(label_color, color, i))
                 drawn_coords.add(pos)
 
+    return scat
+
 
 def plot_line(ax, points, linewidth=1, color=None, **kwargs):
     """
@@ -187,11 +198,11 @@ def plot_line(ax, points, linewidth=1, color=None, **kwargs):
     :param linewidth: line width
     :param color: line color
     :param kwargs: additional parameters passed to matplotlib's `plot` function
-    :return: None
+    :return: return value from `ax.plot()`
     """
     x, y = xy_from_points(points)
 
-    ax.plot(x, y, linewidth=linewidth, color=color, **kwargs)
+    return ax.plot(x, y, linewidth=linewidth, color=color, **kwargs)
 
 
 def plot_polygon(ax, polygon, facecolor=None, edgecolor=None, linewidth=1, linestyle='solid',
@@ -209,14 +220,16 @@ def plot_polygon(ax, polygon, facecolor=None, edgecolor=None, linewidth=1, lines
     :param label_fontsize: label font size
     :param label_color: label color
     :param kwargs: additonal parameters passed to matplotlib `PatchCollection` object
-    :return: None
+    :return: return value from `ax.add_collection()`
     """
-    ax.add_collection(PatchCollection([PolygonPatch(polygon)],
-                                      facecolor=facecolor, edgecolor=edgecolor,
-                                      linewidth=linewidth, linestyle=linestyle,
-                                      **kwargs))
+    coll = ax.add_collection(PatchCollection([PolygonPatch(polygon)],
+                                             facecolor=facecolor, edgecolor=edgecolor,
+                                             linewidth=linewidth, linestyle=linestyle,
+                                             **kwargs))
     if label:
         ax.text(polygon.centroid.x, polygon.centroid.y, label, fontsize=label_fontsize, color=label_color)
+
+    return coll
 
 
 def plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, points, region_pts=None,

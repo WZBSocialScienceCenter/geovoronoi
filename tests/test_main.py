@@ -216,7 +216,7 @@ def test_voronoi_italy_with_plot(n_pts, per_geom):
     assert 0 < len(region_polys) <= n_pts
 
     # generate plot
-    fig, ax = subplot_for_map()
+    fig, ax = subplot_for_map(show_spines=True)
     plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, coords, region_pts,
                                            point_labels=list(map(str, range(len(coords)))))
 
@@ -279,7 +279,7 @@ def test_voronoi_geopandas_with_plot():
     assert len(region_polys) == len(region_pts) == len(coords)
 
     # generate plot
-    fig, ax = subplot_for_map()
+    fig, ax = subplot_for_map(show_spines=True)
     plot_voronoi_polys_with_points_in_area(ax, south_am_shape, region_polys, coords, region_pts)
 
     return fig
@@ -317,7 +317,7 @@ def test_voronoi_sweden_duplicate_points_with_plot():
                   for i_poly, pt_indices in region_pts.items()}
 
     # generate plot
-    fig, ax = subplot_for_map()
+    fig, ax = subplot_for_map(show_spines=True)
     plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, distinct_pt_coords,
                                            plot_voronoi_opts={'alpha': 0.2},
                                            plot_points_opts={'alpha': 0.4},
@@ -363,7 +363,7 @@ def test_issue_7b():
 
     assert all([len(pts_in_region) == 1 for pts_in_region in region_pts.values()])  # no duplicates
 
-    fig, ax = subplot_for_map()
+    fig, ax = subplot_for_map(show_spines=True)
     plot_voronoi_polys_with_points_in_area(ax, polygon, region_polys, centroids, region_pts)
 
     return fig
