@@ -253,7 +253,7 @@ def plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, points,
     as `plot_area_opts`, `plot_voronoi_opts` or `plot_points_opts` respectively.
 
     :param ax: matplotlib Axes object to plot on
-    :param area_shape: geographic shape surrounding the Voronoi regions
+    :param area_shape: geographic shape surrounding the Voronoi regions; can be None to disable plotting of geogr. shape
     :param region_polys: dict mapping region IDs to Voronoi region geometries
     :param points: NumPy array or list of Shapely Point objects
     :param region_pts: dict mapping Voronoi region IDs to point indices of `points`
@@ -281,10 +281,11 @@ def plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, points,
     plot_voronoi_opts = plot_voronoi_opts or {'alpha': 0.5}
     plot_points_opts = plot_points_opts or {}
 
-    plot_polygon_collection_with_color(ax, [area_shape], color=area_color, edgecolor=area_edgecolor, **plot_area_opts)
+    if area_shape is not None:
+        plot_polygon_collection_with_color(ax, [area_shape], color=area_color, edgecolor=area_edgecolor,
+                                           **plot_area_opts)
 
-    if voronoi_and_points_cmap and region_pts and \
-            not all(map(bool, (voronoi_color, voronoi_edgecolor, points_color))):
+    if voronoi_and_points_cmap and region_pts and (voronoi_color is None or points_color is None):
         voronoi_color, points_color = colors_for_voronoi_polys_and_points(region_polys, region_pts,
                                                                           point_indices=list(range(len(points))),
                                                                           cmap_name=voronoi_and_points_cmap)

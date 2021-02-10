@@ -167,7 +167,10 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
     # iterate through sub-geometries in `geo_shape`
     for i_geom, geom in enumerate(geoms):
         # get point indices of points that lie within `geom`
-        pts_in_geom = [i for i in pts_indices if geom.contains(pts[i])]
+        if len(geoms) == 1 or i_geom == len(geoms) - 1:
+            pts_in_geom = list(pts_indices)     # no need to check if we only have one geom or only one geom left
+        else:
+            pts_in_geom = [i for i in pts_indices if geom.contains(pts[i])]
 
         # start with empty data for this sub-geometry
         geom_region_polys[i_geom] = {}
@@ -179,7 +182,8 @@ def voronoi_regions_from_coords(coords, geo_shape, per_geom=True, return_unassig
             continue
 
         # remove the points that we're about to use (point - geometry assignment is bijective)
-        pts_indices.difference_update(pts_in_geom)
+        if i_geom < len(geoms) - 1:   # no need to do this on last iteration
+            pts_indices.difference_update(pts_in_geom)
 
         # generate the Voronoi regions using the SciPy Voronoi class
         logger.info('generating Voronoi regions')

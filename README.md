@@ -6,9 +6,9 @@ Markus Konrad <markus.konrad@wzb.eu>, February 2021
 
 ![Voronoi regions of random points across Spain and their respective area](https://raw.githubusercontent.com/WZBSocialScienceCenter/geovoronoi/master/examples/random_points_and_area.png)
 
-*geovoronoi* helps generating [Voronoi regions](https://en.wikipedia.org/wiki/Voronoi_diagram) for geographic data, for example coordinates of public universities in a certain country. This in turn may be used to estimate some kind of "coverage".
+*geovoronoi* helps generating [Voronoi regions](https://en.wikipedia.org/wiki/Voronoi_diagram) for geographic data, for example coordinates of public universities in a certain country. This in turn may be used to estimate some kind of "coverage". The usage is not confined to geographic data, though. This package allows you to generate finite Voronoi regions inside any valid surrounding polygonal shape. 
 
-It takes a list of coordinates and calculates the Voronoi regions from them using [SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.Voronoi.html#scipy.spatial.Voronoi). At the edges, these regions go to infinity. We can then take the shape of the surrounding area (e.g. the shape of a country as polygon) to cut the Voronoi regions so that they fit into the provided shape, making the regions at the edges finite. *geovoronoi* uses [shapely](http://toblerity.org/shapely/) for these operations. The package furthermore implements some functions for easy plotting of the resulting Voronoi regions.
+The main function of this package, `voronoi_regions_from_coords()`, takes a list of coordinates and calculates the Voronoi regions from them using [SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.Voronoi.html#scipy.spatial.Voronoi). At the edges, these regions go to infinity. We can then take the shape of the surrounding area (e.g. the shape of a country as polygon) to cut the Voronoi regions so that they fit into the provided shape, making the regions at the edges finite. *geovoronoi* uses [shapely](http://toblerity.org/shapely/) for these operations. The package furthermore implements some functions for easy plotting of the resulting Voronoi regions.
 
 ## Installation
 
