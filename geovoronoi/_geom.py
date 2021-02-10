@@ -1,85 +1,92 @@
 """
 Geometry helper functions in cartesian 2D space.
 
-"shapely" refers to the [Shapely Python package for computational geometry](http://toblerity.org/shapely/index.html).
+"Shapely" refers to the [Shapely Python package for computational geometry](http://toblerity.org/shapely/index.html).
 
 Author: Markus Konrad <markus.konrad@wzb.eu>
 """
 
 
 import numpy as np
-from shapely.geometry import Polygon
 
 
-def angle_between_pts(a, b, ref_vec=(1.0, 0.0)):
+def line_segment_intersection(l_off, l_dir, segm_a, segm_b):
     """
-    Angle *theta* between two points (numpy arrays) `a` and `b` in relation to a reference vector `ref_vec`.
-    By default, `ref_vec` is the x-axis (i.e. unit vector (1, 0)).
-    *theta* is in [0, 2Pi] unless `a` and `b` are very close. In this case this function returns NaN.
+    Check for line - segment intersection between line defined as `l_off + t * l_dir` and line segment between points
+    `segm_a` and `segm_b`. Hence the line is conceived as line starting at `l_off` and heading in direction `l_dir`
+    towards infinity. The function returns the intersection point as 1D NumPy array `[x, y]` if the given line hits
+    the defined segment between points `segm_a` and `segm_b` (endpoints inclusive). If there's no intersection, the
+    function returns None.
+
+    All arguments must be 1D NumPy arrays of size 2.
+
+    :param l_off: line offset point
+    :param l_dir: line direction vector
+    :param segm_a: segment start point
+    :param segm_b: segment end point
+    :return: intersection point as 1D NumPy array `[x, y]` or None if there is no intersection.
     """
-    ang = inner_angle_between_vecs(a - b, np.array(ref_vec))
-    if not np.isnan(ang) and a[1] < b[1]:
-        ang = 2 * np.pi - ang
 
-    return ang
+    if not all(isinstance(arg, np.ndarray) and arg.shape == (2,) for arg in (l_off, l_dir, segm_a, segm_b)):
+        raise ValueError('all arguments must be 1D NumPy arrays of size 2')
 
+    if np.isclose(np.linalg.norm(l_dir), 0):
+        raise ValueError('vector length of `l_dir` must be greater than 0')
 
-def inner_angle_between_vecs(a, b):
-    """
-    Return the inner angle *theta* between numpy vectors `a` and `b`. *theta* is in [0, Pi] if both `a` and `b` are
-    not at the origin (0, 0), otherwise this function returns NaN.
-    """
-    origin = np.array((0, 0))
-    if np.allclose(a, origin) or np.allclose(b, origin):
-        return np.nan
+    if np.isclose(np.linalg.norm(segm_b - segm_a), 0):
+        raise ValueError('vector length between `segm_a` and `segm_b` must be greater than 0')
 
-    au = a / np.linalg.norm(a)
-    bu = b / np.linalg.norm(b)
-    ang = np.arccos(np.clip(np.dot(au, bu), -1.0, 1.0))
+    segm_dir = segm_b - segm_a
+    v = np.array([l_dir, -segm_dir]).T
+    p = segm_a - l_off
 
-    return ang
+    if np.isclose(np.linalg.det(v), 0):   # det of direction vector matrix is zero -> parallel direction vectors
+        if np.isclose(np.linalg.det(np.array([p, l_dir])), 0):  # det of vector offset matrix is zero
+                                                                # -> possible overlap
+            # order segment end points either horizontally or vertically
+            if segm_a[0] > segm_b[0] or \
+                    (np.isclose(segm_a[0], segm_b[0]) and segm_a[1] > segm_b[1]):  # if horizontally aligned,
+                                                                                   # order on y-axis
+                segm_b, segm_a = segm_a, segm_b
 
+            nonzero_ind = np.nonzero(l_dir)[0]   # norm is > 0 so there must be a nonzero index
+            t_a = (segm_a - l_off)[nonzero_ind] / l_dir[nonzero_ind]        # segm_a = l_off + t_a * l_dir
+            t_b = (segm_b - l_off)[nonzero_ind] / l_dir[nonzero_ind]        # segm_b = l_off + t_b * l_dir
 
-def polygon_around_center(points, center=None, fix_nan_angles=True):
-    """
-    Order numpy array of coordinates `points` around `center` so that they form a valid polygon. Return that as
-    shapely `Polygon` object. If no valid polygon can be formed, return `None`.
-    If `center` is None (default), use midpoint of `points` as center.
-    """
-    if center is None:
-        center = points.mean(axis=0)
+            t = np.array([t_a, t_b])
+            t = t[t >= 0]
+            if len(t) > 0:
+                return l_off + np.min(t) * l_dir
+
+        return None   # either parallel directions or line doesn't intersect with any segment endpoint
     else:
-        center = np.array(center)
+        t = np.matmul(np.linalg.inv(v), p.T)
+        # intersection at l_off + t_0 * l_dir and segm_a + t_1 * segm_dir
+        # -> we're only interested if l_dir hits the segment (segm_a,segm_b) when it goes in positive direction,
+        #    hence if t_0 is positive and t_1 is in [0, 1]
 
-    # angle between each point in `points` and `center`
-    angles = np.apply_along_axis(angle_between_pts, 1, points, b=center)
-
-    # sort by angles and generate polygon
-    if fix_nan_angles:
-        for repl in (0, np.pi):
-            tmp_angles = angles.copy()
-            tmp_angles[np.isnan(tmp_angles)] = repl
-            poly = Polygon(points[np.argsort(tmp_angles)])
-            if poly.is_simple and poly.is_valid:
-                return poly
-
-        return None
-    else:
-        poly = Polygon(points[np.argsort(angles)])
-
-        if poly.is_simple and poly.is_valid:
-            return poly
+        if t[0] >= 0 and 0 <= t[1] <= 1:
+            return segm_a + t[1] * segm_dir
         else:
             return None
 
 
-def calculate_polygon_areas(poly_shapes, m2_to_km2=False):
+def calculate_polygon_areas(region_polys, m2_to_km2=False):
     """
-    Return the area of the respective polygons in `poly_shapes`. Returns a NumPy array of areas in m² (if `m2_to_km2` is
-    False) or km² (otherwise).
+    Return the area of the respective polygons in `poly_shapes` either in unit square meters (`m2_to_km2` is False) or
+    in square kilometers (`m2_to_km2` is True). Does not really calculate the area but uses the `area` property of
+    the Shapely polygons.
+
+    Note: It is important to use an *equal area* projection with meters as units before using the areas of the
+          Voronoi regions!
+
+    :param region_polys: dict mapping Voronoi region IDs to Shapely Polygon/MultiPolygon objects
+    :param m2_to_km2: if True, return results as square kilometers, otherwise square meters
+    :return: dict mapping Voronoi region IDs to area in square meters or square kilometers
     """
-    areas = np.array([p.area for p in poly_shapes])
-    if m2_to_km2:
-        return areas / 1000000    # = 1000²
-    else:
-        return areas
+
+    if not isinstance(region_polys, dict):
+        raise ValueError('`poly_shapes` must be a dict')
+
+    unit_convert = 1000000 if m2_to_km2 else 1
+    return {i_poly: p.area / unit_convert for i_poly, p in region_polys.items()}

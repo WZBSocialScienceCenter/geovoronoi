@@ -1,67 +1,56 @@
-from math import pi, isclose
-from itertools import permutations
+"""
+Tests for the private _geom module.
 
-from hypothesis import given
+Author: Markus Konrad <markus.konrad@wzb.eu>
+"""
+
+import pytest
 import numpy as np
 
-from ._testtools import real_coords_2d
-from geovoronoi._geom import angle_between_pts, inner_angle_between_vecs, polygon_around_center, calculate_polygon_areas
+from geovoronoi._geom import calculate_polygon_areas, line_segment_intersection
 
 
-@given(a=real_coords_2d(), b=real_coords_2d())
-def test_inner_angle_between_vecs(a, b):
-    a = np.array(a)
-    b = np.array(b)
-    origin = np.array((0, 0))
-
-    ang = inner_angle_between_vecs(a, b)
-
-    if np.allclose(a, origin, rtol=0) or np.allclose(b, origin, rtol=0):
-        assert np.isnan(ang)
+@pytest.mark.parametrize(
+    'l_off, l_dir, segm_a, segm_b, expected',
+    [
+        ([4, 7], [12, -4], [1, 1], [17, 5], [13, 4]),
+        # overlapping
+        ([1, 1], [2, 1], [2, 1.5], [4, 2.5], [2, 1.5]),
+        ([1, 1], [2, 1], [1, 1], [3, 2], [1, 1]),
+        ([2, 1.5], [2, 1], [2, 1.5], [4, 2.5], [2, 1.5]),
+        ([3, 2], [2, 1], [2, 1.5], [4, 2.5], [4, 2.5]),
+        ([3, 2], [2, 1], [4, 2.5], [2, 1.5], [4, 2.5]),
+        ([4, 2.5], [2, 1], [2, 1.5], [4, 2.5], [4, 2.5]),
+        ([5, 3], [2, 1], [2, 1.5], [4, 2.5], None),     # "wrong" direction
+        ([5, 3], [-2, -1], [2, 1.5], [4, 2.5], [4, 2.5]),
+        ([-1, 0], [-2, -1], [2, 1.5], [4, 2.5], None),  # "wrong" direction
+        # parallel
+        ([1, 3], [2, 1], [2, 1.5], [4, 2.5], None),
+        ([1, 3], [-2, -1], [2, 1.5], [4, 2.5], None),
+        # some edge-cases
+        ([0, 0], [0, 1], [0, 0], [0, 1], [0, 0]),
+        ([0, 0], [1, 0], [0, 0], [1, 0], [0, 0]),
+    ]
+)
+def test_line_segment_intersection(l_off, l_dir, segm_a, segm_b, expected):
+    res = line_segment_intersection(np.array(l_off),
+                                    np.array(l_dir),
+                                    np.array(segm_a),
+                                    np.array(segm_b))
+    if expected is None:
+        assert res is None
     else:
-        assert 0 <= ang <= pi
-
-
-@given(a=real_coords_2d(), b=real_coords_2d())
-def test_angle_between_pts(a, b):
-    a = np.array(a)
-    b = np.array(b)
-
-    ang = angle_between_pts(a, b)
-
-    if np.allclose(a, b, rtol=0):
-        assert np.isnan(ang)
-    else:
-        assert 0 <= ang <= 2*pi
-
-
-def test_polygon_around_center():
-    points = np.array([[0, 0], [1, 0], [1, 1], [1, 0], [1, -1]])
-
-    for perm_ind in permutations(range(len(points))):
-        # many of these permutations do not form a valid polygon in that order
-        # `polygon_around_center` will make sure that the order of points is correct to create a polygon around the
-        # center of these points
-        poly = polygon_around_center(points[perm_ind,:])
-
-        assert poly.is_simple and poly.is_valid
-
-
-def test_polygon_around_center_given_center_is_one_of_points():
-    points = np.array([[0, 0], [1, 0], [1, 1], [1, 0], [0.5, 0.5]])
-
-    for perm_ind in permutations(range(len(points))):
-        # many of these permutations do not form a valid polygon in that order
-        # `polygon_around_center` will make sure that the order of points is correct to create a polygon around the
-        # center of these points
-        poly = polygon_around_center(points[perm_ind,:], center=(0.5, 0.5))
-
-        assert poly.is_simple and poly.is_valid
+        assert np.array_equal(res, np.array(expected))
 
 
 def test_calculate_polygon_areas_empty():
-    areas = calculate_polygon_areas([])
+    areas = calculate_polygon_areas({})
     assert len(areas) == 0
+
+
+def test_calculate_polygon_areas_nondict():
+    with pytest.raises(ValueError):
+        calculate_polygon_areas([])
 
 
 def test_calculate_polygon_areas_world():
@@ -69,12 +58,15 @@ def test_calculate_polygon_areas_world():
 
     world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
     world = world[world.continent != 'Antarctica'].to_crs(epsg=3395)  # meters as unit!
+    geoms = {i: geom for i, geom in enumerate(world.geometry)}
 
-    areas = calculate_polygon_areas(world.geometry)
+    areas = calculate_polygon_areas(geoms)
 
+    assert isinstance(areas, dict)
     assert len(areas) == len(world)
-    assert all(0 <= a < 9e13 for a in areas)
+    assert all(0 < a < 9e13 for a in areas.values())
 
-    areas_km2 = calculate_polygon_areas(world.geometry, m2_to_km2=True)
+    areas_km2 = calculate_polygon_areas(geoms, m2_to_km2=True)
+    assert isinstance(areas_km2, dict)
     assert len(areas_km2) == len(world)
-    assert all(isclose(a_m, a_km * 1e6) for a_m, a_km in zip(areas, areas_km2))
+    assert all(np.isclose(a_m, a_km * 1e6) for a_m, a_km in zip(areas.values(), areas_km2.values()))

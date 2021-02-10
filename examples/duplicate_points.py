@@ -4,7 +4,7 @@ Example script to show how to handle duplicate points for which Voronoi regions 
 Duplicate points, i.e. points with exactly the same coordinates will belong to the same Voronoi region.
 
 Author: Markus Konrad <markus.konrad@wzb.eu>
-March 2018
+January 2021
 """
 
 
@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import geopandas as gpd
 
-from geovoronoi import coords_to_points, points_to_coords, voronoi_regions_from_coords, get_points_to_poly_assignments
+from geovoronoi import coords_to_points, points_to_coords, voronoi_regions_from_coords, points_to_region
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 
 
@@ -22,6 +22,9 @@ logging.basicConfig(level=logging.INFO)
 geovoronoi_log = logging.getLogger('geovoronoi')
 geovoronoi_log.setLevel(logging.INFO)
 geovoronoi_log.propagate = True
+
+
+#%%
 
 N_POINTS = 20
 N_DUPL = 10
@@ -61,11 +64,8 @@ coords = np.concatenate((coords, coords[rand_dupl_ind]))
 
 print('duplicated %d random points -> we have %d coordinates now' % (N_DUPL, len(coords)))
 
-# if we didn't know in advance how many duplicates we have (and which points they are), we could find out like this:
-# unique_coords, unique_ind, dupl_counts = np.unique(coords, axis=0, return_index=True, return_counts=True)
-# n_dupl = len(coords) - len(unique_ind)
-# n_dupl
-# >>> 10
+
+#%%
 
 #
 # calculate the Voronoi regions, cut them with the geographic area shape and assign the points to them
@@ -73,44 +73,42 @@ print('duplicated %d random points -> we have %d coordinates now' % (N_DUPL, len
 # the duplicate coordinates will belong to the same voronoi region
 #
 
-poly_shapes, pts, poly_to_pt_assignments = voronoi_regions_from_coords(coords, area_shape,
-                                                                       accept_n_coord_duplicates=N_DUPL)
+region_polys, region_pts = voronoi_regions_from_coords(coords, area_shape)
 
 # poly_to_pt_assignments is a nested list because a voronoi region might contain several (duplicate) points
 
 print('\n\nvoronoi region to points assignments:')
-for i_poly, pt_indices in enumerate(poly_to_pt_assignments):
+for i_poly, pt_indices in region_pts.items():
     print('> voronoi region', i_poly, '-> points', str(pt_indices))
 
 print('\n\npoints to voronoi region assignments:')
-pts_to_poly_assignments = np.array(get_points_to_poly_assignments(poly_to_pt_assignments))
-for i_pt, i_poly in enumerate(pts_to_poly_assignments):
+pts_to_poly_assignments = points_to_region(region_pts)
+for i_pt, i_poly in pts_to_poly_assignments.items():
     print('> point ', i_pt, '-> voronoi region', i_poly)
 
 
-#
-# plotting
-#
+#%% plotting
 
-# make point labels: counts of duplicates per points
-count_per_pt = [sum(pts_to_poly_assignments == i_poly) for i_poly in pts_to_poly_assignments]
-pt_labels = list(map(str, count_per_pt))
+# make point labels: counts of duplicate assignments per points
+count_per_pt = {pt_indices[0]: len(pt_indices) for pt_indices in region_pts.values()}
+pt_labels = list(map(str, count_per_pt.values()))
+distinct_pt_coords = coords[np.asarray(list(count_per_pt.keys()))]
 
 # highlight voronoi regions with point duplicates
-count_per_poly = np.array(list(map(len, poly_to_pt_assignments)))
-vor_colors = np.repeat('blue', len(poly_shapes))   # default color
-vor_colors[count_per_poly > 1] = 'red'             # hightlight color
+vor_colors = {i_poly: (1,0,0) if len(pt_indices) > 1 else (0,0,1)
+              for i_poly, pt_indices in region_pts.items()}
 
 fig, ax = subplot_for_map()
 
-plot_voronoi_polys_with_points_in_area(ax, area_shape, poly_shapes, coords,
+plot_voronoi_polys_with_points_in_area(ax, area_shape, region_polys, distinct_pt_coords,
                                        plot_voronoi_opts={'alpha': 0.2},
                                        plot_points_opts={'alpha': 0.4},
-                                       voronoi_color=list(vor_colors),
+                                       voronoi_color=vor_colors,
+                                       voronoi_edgecolor=(0,0,0,1),
                                        point_labels=pt_labels,
-                                       points_markersize=np.array(count_per_pt)*10)
+                                       points_markersize=np.square(np.array(list(count_per_pt.values())))*10)
 
-ax.set_title('%d random points (incl. %d duplicates)\nand their Voronoi regions in %s' % (len(pts), N_DUPL, COUNTRY))
+ax.set_title('%d random points (incl. %d duplicates)\nand their Voronoi regions in %s' % (len(coords), N_DUPL, COUNTRY))
 
 plt.tight_layout()
 plt.savefig('duplicate_points.png')
