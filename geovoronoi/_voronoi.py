@@ -10,7 +10,12 @@ import logging
 from collections import defaultdict
 
 import numpy as np
-from scipy.spatial import Voronoi, QhullError
+
+try:
+    from scipy.spatial import Voronoi, QhullError
+except ImportError:
+    from scipy.spatial.qhull import QhullError    # for older versions of scipy
+
 from shapely.geometry import box, LineString, Point, MultiPoint, Polygon, MultiPolygon
 from shapely.errors import TopologicalError
 from shapely.ops import unary_union
