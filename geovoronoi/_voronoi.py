@@ -10,11 +10,15 @@ import logging
 from collections import defaultdict
 
 import numpy as np
-from scipy.spatial import Voronoi
-from scipy.spatial.qhull import QhullError
-from shapely.geometry import box, LineString, asPoint, MultiPoint, Polygon, MultiPolygon
+
+try:
+    from scipy.spatial import Voronoi, QhullError
+except ImportError:
+    from scipy.spatial.qhull import QhullError    # for older versions of scipy
+
+from shapely.geometry import box, LineString, Point, MultiPoint, Polygon, MultiPolygon
 from shapely.errors import TopologicalError
-from shapely.ops import cascaded_union
+from shapely.ops import unary_union
 
 from ._geom import line_segment_intersection
 
@@ -32,7 +36,7 @@ def coords_to_points(coords):
     :param coords: NumPy array of shape (N,2) with N coordinates in 2D space
     :return: list of length N with Shapely Point objects
     """
-    return list(map(asPoint, coords))
+    return list(map(Point, coords))
 
 
 def points_to_coords(pts):
@@ -276,7 +280,7 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
     geom_bb = box(*geom.bounds).buffer(bounds_buf)
 
     # center of all points
-    center = np.array(MultiPoint(vor.points).convex_hull.centroid)
+    center = np.array(MultiPoint(vor.points).convex_hull.centroid.coords)
 
     # ridge vertice's coordinates
     ridge_vert = np.asarray(vor.ridge_vertices)
@@ -361,7 +365,10 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
                                 isects.append(isect)
 
                         if len(isects) == 0:
-                            raise RuntimeError('ridge line must intersect with surrounding geometry from `geom`')
+                            raise RuntimeError('ridge line must intersect with surrounding geometry from `geom`; '
+                                               'this error often arises when there are points outside of the '
+                                               'surrounding geometries; first check if all your points are inside '
+                                               'the surrounding geometries')
                         elif len(isects) == 1:   # one intersection
                             far_pt = isects[0]
                         else:                    # multiple intersections - take closest intersection
@@ -440,14 +447,14 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
             if len(inner_regions) == 1:
                 inner_regions_poly = region_polys[next(iter(inner_regions))]
             else:
-                inner_regions_poly = cascaded_union([region_polys[i_reg] for i_reg in inner_regions])
+                inner_regions_poly = unary_union([region_polys[i_reg] for i_reg in inner_regions])
 
         # generate polygon from all other regions' polygons other than the current region `i_reg`
         other_regions_polys = [region_polys[i_other] for i_other in border_regions if i_reg != i_other]
         if inner_regions_poly:
             other_regions_polys.append(inner_regions_poly)
 
-        union_other_regions = cascaded_union(other_regions_polys)
+        union_other_regions = unary_union(other_regions_polys)
 
         # generate difference between geom and other regions' polygons -- what's left is the current region's area
         # plus any so far uncovered area
@@ -489,7 +496,7 @@ def region_polygons_from_voronoi(vor, geom, return_point_assignments=False,
         # add new areas as union
         if add:
             old_reg_area = region_polys[i_reg].area
-            new_reg = cascaded_union([p] + add)
+            new_reg = unary_union([p] + add)
             area_diff = new_reg.area - old_reg_area
 
             region_polys[i_reg] = new_reg

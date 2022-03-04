@@ -9,7 +9,7 @@ import logging
 
 import matplotlib.pyplot as plt
 import geopandas as gpd
-from shapely.ops import cascaded_union
+from shapely.ops import unary_union
 
 from geovoronoi.plotting import subplot_for_map, plot_voronoi_polys_with_points_in_area
 from geovoronoi import voronoi_regions_from_coords, points_to_coords
@@ -34,7 +34,7 @@ south_am = world[world.continent == 'South America'].to_crs(epsg=3395)
 cities = cities.to_crs(south_am.crs)   # convert city coordinates to same CRS!
 
 # create the bounding shape as union of all South American countries' shapes
-south_am_shape = cascaded_union(south_am.geometry)
+south_am_shape = unary_union(south_am.geometry)
 south_am_cities = cities[cities.geometry.within(south_am_shape)]   # reduce to cities in South America
 
 #%%
