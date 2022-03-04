@@ -1,5 +1,7 @@
 # geovoronoi – a package to create and plot Voronoi regions inside geographic areas
 
+[![PyPI version](https://badge.fury.io/py/geovoronoi.svg)](https://badge.fury.io/py/geovoronoi) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4531339.svg)](https://doi.org/10.5281/zenodo.4531339)
+
 Markus Konrad <markus.konrad@wzb.eu>, February 2021
 
 ## Overview
