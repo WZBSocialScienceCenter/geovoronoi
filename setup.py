@@ -8,7 +8,7 @@ from setuptools import setup
 GITHUB_URL = 'https://github.com/WZBSocialScienceCenter/geovoronoi'
 
 __title__ = 'geovoronoi'
-__version__ = '0.3.1.dev'
+__version__ = '0.4.0'
 __author__ = 'Markus Konrad'
 __license__ = 'Apache License 2.0'
 

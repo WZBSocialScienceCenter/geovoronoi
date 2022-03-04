@@ -1,5 +1,12 @@
 # Changes
 
+## 0.4.0
+
+- better exception message for *"ridge line must intersect ..."* RuntimeError
+- added Python 3.10 support
+- update dependencies
+- fixed warnings for updated dependencies
+
 ## 0.3.0
 
 **This is a major update that changes the default behavior and accepted arguments of `voronoi_regions_from_coords()`.**
