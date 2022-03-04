@@ -14,6 +14,6 @@ from ._geom import calculate_polygon_areas, line_segment_intersection
 
 
 __title__ = 'geovoronoi'
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 __author__ = 'Markus Konrad'
 __license__ = 'Apache License 2.0'

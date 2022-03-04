@@ -6,8 +6,8 @@ Author: Markus Konrad <markus.konrad@wzb.eu>
 
 import numpy as np
 import geopandas as gpd
-from shapely.geometry import Polygon, MultiPolygon, asPoint
-from shapely.ops import cascaded_union
+from shapely.geometry import Polygon, MultiPolygon, Point
+from shapely.ops import unary_union
 import pytest
 from hypothesis import given, settings
 import hypothesis.strategies as st
@@ -263,7 +263,7 @@ def test_voronoi_geopandas_with_plot():
     cities = cities.to_crs(south_am.crs)  # convert city coordinates to same CRS!
 
     # create the bounding shape as union of all South American countries' shapes
-    south_am_shape = cascaded_union(south_am.geometry)
+    south_am_shape = unary_union(south_am.geometry)
     south_am_cities = cities[cities.geometry.within(south_am_shape)]  # reduce to cities in South America
 
     # convert the pandas Series of Point objects to NumPy array of coordinates
@@ -407,7 +407,7 @@ def _check_region_polys(region_polys, region_pts, coords, expected_sum_area,
                 polybuf = poly
         else:
             polybuf = poly
-        assert all([polybuf.contains(asPoint(coords[i_pt])) for i_pt in pt_indices])
+        assert all([polybuf.contains(Point(coords[i_pt])) for i_pt in pt_indices])
 
         sum_area += poly.area
 

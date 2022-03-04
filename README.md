@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/geovoronoi.svg)](https://badge.fury.io/py/geovoronoi) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4531339.svg)](https://doi.org/10.5281/zenodo.4531339)
 
-Markus Konrad <markus.konrad@wzb.eu>, February 2021
+Markus Konrad <markus.konrad@wzb.eu>, March 2022
 
 ## Overview
 
@@ -89,7 +89,7 @@ See the full example source code in [examples/random_points_across_italy.py](exa
 
 ## Dependencies
 
-*geovoronoi* requires **Python 3.6 or newer**. The following packages need to be installed (if not, they will be automatically installed if you use a Python package manager like *pip*):
+*geovoronoi* requires **Python 3.6 or newer** (the package is tested for up to Python 3.10). The following packages need to be installed (if not, they will be automatically installed if you use a Python package manager like *pip*):
 
 * NumPy
 * SciPy
