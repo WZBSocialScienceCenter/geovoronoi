@@ -26,7 +26,7 @@ pip install -U geovoronoi
 
 ## Usage
 
-You have a geographic area that contains some points for which you want to generate Voronoi regions. This geographic area is a [shapely Polygon/MultiPolygon object](http://toblerity.org/shapely/manual.html#polygons) (that you, for example, obtained from a GeoJSON file that you loaded with [GeoPandas](http://geopandas.org/) or [Fiona](http://toblerity.org/fiona/)). The *N* points you have are either in the form of a *N*x2 NumPy array, or a list of shapely Point objects (they can be converted with the functions `coords_to_points` and `points_to_coords`). Both the points and the surrounding geographic area must in the same [CRS (coordinate reference system)](https://en.wikipedia.org/wiki/Spatial_reference_system).
+You have a geographic area that contains some points for which you want to generate Voronoi regions. This geographic area is a [shapely Polygon/MultiPolygon object](http://toblerity.org/shapely/manual.html#polygons) (that you, for example, obtained from a GeoJSON file that you loaded with [GeoPandas](http://geopandas.org/) or [Fiona](http://toblerity.org/fiona/)). The *N* points you have are either in the form of a *N*x2 NumPy array, or a list of shapely Point objects (they can be converted with the functions `coords_to_points` and `points_to_coords`). Both the points and the surrounding geographic area must be in the same [CRS (coordinate reference system)](https://en.wikipedia.org/wiki/Spatial_reference_system).
 
 Let's take for example these randomly generated points in Italy (in [World Mercator CRS](https://epsg.io/3395)): 
 
