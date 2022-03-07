@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/geovoronoi.svg)](https://badge.fury.io/py/geovoronoi) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6327256.svg)](https://doi.org/10.5281/zenodo.6327256)
 
-Markus Konrad <markus.konrad@wzb.eu>, March 2022
+Markus Konrad <markus.konrad@wzb.eu> / <post@mkonrad.net>, March 2022
 
 ## Overview
 
