@@ -10,7 +10,7 @@ Markus Konrad <markus.konrad@wzb.eu> / <post@mkonrad.net>, March 2022
 
 *geovoronoi* helps generating [Voronoi regions](https://en.wikipedia.org/wiki/Voronoi_diagram) for geographic data, for example coordinates of public universities in a certain country. This in turn may be used to estimate some kind of "coverage". The usage is not confined to geographic data, though. This package allows you to generate finite Voronoi regions inside any valid surrounding polygonal shape. 
 
-The main function of this package, `voronoi_regions_from_coords()`, takes a list of coordinates and calculates the Voronoi regions from them using [SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.Voronoi.html#scipy.spatial.Voronoi). At the edges, these regions go to infinity. We can then take the shape of the surrounding area (e.g. the shape of a country as polygon) to cut the Voronoi regions so that they fit into the provided shape, making the regions at the edges finite. *geovoronoi* uses [shapely](http://toblerity.org/shapely/) for these operations. The package furthermore implements some functions for easy plotting of the resulting Voronoi regions.
+The main function of this package, `voronoi_regions_from_coords()`, takes a list of coordinates and calculates the Voronoi regions from them using [SciPy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.Voronoi.html#scipy.spatial.Voronoi). At the edges, these regions go to infinity. We can then take the shape of the surrounding area (e.g. the shape of a country as polygon) to cut the Voronoi regions so that they fit into the provided shape, making the regions at the edges finite. *geovoronoi* uses [shapely](https://shapely.readthedocs.io/) for these operations. The package furthermore implements some functions for easy plotting of the resulting Voronoi regions.
 
 ## Installation
 
@@ -26,7 +26,7 @@ pip install -U geovoronoi
 
 ## Usage
 
-You have a geographic area that contains some points for which you want to generate Voronoi regions. This geographic area is a [shapely Polygon/MultiPolygon object](http://toblerity.org/shapely/manual.html#polygons) (that you, for example, obtained from a GeoJSON file that you loaded with [GeoPandas](http://geopandas.org/) or [Fiona](http://toblerity.org/fiona/)). The *N* points you have are either in the form of a *N*x2 NumPy array, or a list of shapely Point objects (they can be converted with the functions `coords_to_points` and `points_to_coords`). Both the points and the surrounding geographic area must be in the same [CRS (coordinate reference system)](https://en.wikipedia.org/wiki/Spatial_reference_system).
+You have a geographic area that contains some points for which you want to generate Voronoi regions. This geographic area is a [shapely Polygon/MultiPolygon object](https://shapely.readthedocs.io/en/stable/manual.html#polygons) (that you, for example, obtained from a GeoJSON file that you loaded with [GeoPandas](http://geopandas.org/) or [Fiona](https://fiona.readthedocs.io/)). The *N* points you have are either in the form of a *N*x2 NumPy array, or a list of shapely Point objects (they can be converted with the functions `coords_to_points` and `points_to_coords`). Both the points and the surrounding geographic area must be in the same [CRS (coordinate reference system)](https://en.wikipedia.org/wiki/Spatial_reference_system).
 
 Let's take for example these randomly generated points in Italy (in [World Mercator CRS](https://epsg.io/3395)): 
 
@@ -66,7 +66,7 @@ from geovoronoi import voronoi_regions_from_coords
 region_polys, region_pts = voronoi_regions_from_coords(coords, area_shape)
 ```
 
-`region_polys` is a dict that maps Voronoi region IDs to shapely Polygon objects that represent the shape of the respective Voronoi region. With them, you can do everything that the [shapely API](http://toblerity.org/shapely/manual.html#polygons) provides. You can, for example, get each Voronoi region's [area](http://toblerity.org/shapely/manual.html#object.area) (there's also a helper function `calculate_polygon_areas` in *geovoronoi* for that). 
+`region_polys` is a dict that maps Voronoi region IDs to shapely Polygon objects that represent the shape of the respective Voronoi region. With them, you can do everything that the [shapely API](https://shapely.readthedocs.io/en/stable/manual.html#polygons) provides. You can, for example, get each Voronoi region's [area](https://shapely.readthedocs.io/en/stable/manual.html#object.area) (there's also a helper function `calculate_polygon_areas` in *geovoronoi* for that). 
 
 `region_pts` is a dict that maps the same Voronoi region IDs as in `region_polys` to a list of indices into `coords`, i.e. these indices represent the points that belong to this Voronoi region. Usually, this is only a single point. However, in case of duplicate points (i.e. two or more points have exactly the same coordinates) all duplicate points are listed for the respective Voronoi region.
 
