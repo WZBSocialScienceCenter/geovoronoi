@@ -4,6 +4,8 @@
 
 Markus Konrad <markus.konrad@wzb.eu> / <post@mkonrad.net>, March 2022
 
+**This package is currently not maintained. You may prefer to use the [`voronoi_polygons` function from the shapely package](https://shapely.readthedocs.io/en/stable/reference/shapely.voronoi_polygons.html#shapely.voronoi_polygons) instead, which didn't exist when I created the geovoronoi package, but is now considered to be a faster and more reliable option for generating Voronoi regions.**
+
 ## Overview
 
 ![Voronoi regions of random points across Spain and their respective area](https://raw.githubusercontent.com/WZBSocialScienceCenter/geovoronoi/master/examples/random_points_and_area.png)
