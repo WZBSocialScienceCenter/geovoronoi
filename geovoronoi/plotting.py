@@ -8,7 +8,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
 from descartes.patch import PolygonPatch
-from geopandas.plotting import _flatten_multi_geoms
+
+from geopandas import __version__ as version_geopandas
+if version_geopandas < "0.13.0":
+	from geopandas.plotting import _flatten_multi_geoms
+else:
+	from geopandas.plotting import _sanitize_geoms
+
 from geopandas import GeoSeries
 
 from ._voronoi import points_to_coords, points_to_region
