@@ -348,7 +348,11 @@ def plot_polygon_collection_with_color(ax, geoms, color=None, **kwargs):
         color_values = color
         color_indices = np.arange(len(color))
 
-    geoms, multi_indices = _flatten_multi_geoms(geoms)
+    if version_geopandas  < "0.13.0":
+        geoms, multi_indices = _flatten_multi_geoms(geoms)
+    else:
+        geoms, multi_indices = _sanitize_geoms(geoms)
+
 
     if color_indices is not None:  # retain correct color indices
         color_values = color_values[np.nonzero(geoms_indices[multi_indices][..., np.newaxis] == color_indices)[1]]
