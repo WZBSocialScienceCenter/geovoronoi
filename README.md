@@ -89,6 +89,15 @@ This would be an example output:
 
 See the full example source code in [examples/random_points_across_italy.py](examples/random_points_across_italy.py). See also the other examples in the [examples/](examples) directory that show how to calculate the area of the Voronoi regions, handle duplicate points or interact with the GeoPandas or Fiona packages. 
 
+```python
+from geopandas import __version__ as version_geopandas
+if version_geopandas < "0.13.0":
+	from geopandas.plotting import _flatten_multi_geoms
+else:
+	from geopandas.plotting import _sanitize_geoms
+```
+In geopandas v0.13.0 and later, function _flatten_multi_geoms becomes function _sanitize_geoms. Prior to this version (< v0.13.0), the old function name was still used.
+
 ## Dependencies
 
 *geovoronoi* requires **Python 3.6 or newer** (the package is tested for up to Python 3.10). The following packages need to be installed (if not, they will be automatically installed if you use a Python package manager like *pip*):
